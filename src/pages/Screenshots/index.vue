@@ -138,13 +138,13 @@
             </v-col>
         </v-row>
 
-        <!-- Ver imagen a tamaño completo -->
-        <v-dialog v-model="dialog" max-width="95vw" max-height="95vh" scrollable @click:outside="closeDialog">
+        <!-- Ver imagen a tamaño completo - MODIFICADO PARA SER RESPONSIVE -->
+        <v-dialog v-model="dialog" :max-width="dialogMaxWidth" :fullscreen="$vuetify.display.xs" scrollable @click:outside="closeDialog">
             <v-card class="image-dialog">
-                <v-card-title class="d-flex justify-space-between align-center pa-4">
-                    <span class="text-h5">Screenshot Details</span>
+                <v-card-title class="d-flex justify-space-between align-center pa-3">
+                    <span class="text-h6">Screenshot Details</span>
                     <div>
-                        <v-btn icon @click="openInNewTab" color="primary" size="large" title="Open in new tab"
+                        <v-btn icon @click="openInNewTab" color="primary" size="small" title="Open in new tab"
                             class="mr-2">
                             <v-icon>mdi-open-in-new</v-icon>
                         </v-btn>
@@ -152,50 +152,59 @@
                 </v-card-title>
                 <v-divider></v-divider>
 
-                <div class="image-container">
-                    <v-img :src="fullImageUrl" alt="Screenshot" max-height="85vh" max-width="95vw" contain
-                        class="dialog-image">
-                        <template v-slot:placeholder>
-                            <div class="image-placeholder">
-                                <v-progress-circular indeterminate color="primary" size="64" class="mb-4" />
-                                <div class="text-h6">Loading Image...</div>
-                            </div>
-                        </template>
-                    </v-img>
-                </div>
-                <v-card-text class="text-center pa-3" v-if="selectedImageData">
-                    <div class="text-h6 mb-1">{{ selectedEmployee?.profile?.firstName }} {{
-                        selectedEmployee?.profile?.lastName
-                        }}</div>
-                    <div class="text-body-2 mb-1">
-                        {{ formatDisplayDate(selectedImageData.clock_date) }} {{ selectedImageData.clock_time }}
-                    </div>
-                    <div class="text-caption text-medium-emphasis mb-2">
-                        {{ getImageFileName(selectedImageData.image) }}
-                    </div>
-
-                    <!-- Chips en el dialog -->
-                    <v-chip v-if="selectedImageData.type_of_clock" class="mr-1"
-                        :color="getChipColor(selectedImageData.type_of_clock)" small>
-                        {{ formatClockType(selectedImageData.type_of_clock) }}
-                    </v-chip>
-                    <v-chip :color="getStatusColor(selectedImageData.activity_status)" small>
-                        {{ selectedImageData.activity_status }}
-                    </v-chip>
-
-                    <!-- Barra de progreso en el dialog - SOLO si NO es clock_in o clock_out -->
-                    <div v-if="shouldShowProgressBar(selectedImageData)" class="mt-4">
-                        <div class="d-flex justify-space-between align-center mb-1">
-                            <span class="text-body-1">Active Time:</span>
-                            <span class="text-body-1 font-weight-bold">{{
-                                calculatePercentage(selectedImageData.active_time)
-                                }}%</span>
+                <v-card-text class="pa-0">
+                    <div class="dialog-content">
+                        <div class="image-section">
+                            <v-img :src="fullImageUrl" alt="Screenshot" contain
+                                class="dialog-image"
+                                :max-height="imageMaxHeight"
+                                :max-width="imageMaxWidth">
+                                <template v-slot:placeholder>
+                                    <div class="image-placeholder">
+                                        <v-progress-circular indeterminate color="primary" size="48" class="mb-3" />
+                                        <div class="text-body-1">Loading Image...</div>
+                                    </div>
+                                </template>
+                            </v-img>
                         </div>
-                        <v-progress-linear :model-value="calculatePercentage(selectedImageData.active_time)"
-                            :color="getProgressColor(calculatePercentage(selectedImageData.active_time))" height="12"
-                            rounded class="mb-1"></v-progress-linear>
-                        <div class="text-body-2 text-medium-emphasis">
-                            {{ selectedImageData.active_time }} seconds / 300 seconds
+                        
+                        <div class="info-section pa-3" v-if="selectedImageData">
+                            <div class="text-h6 mb-2 text-center">{{ selectedEmployee?.profile?.firstName }} {{
+                                selectedEmployee?.profile?.lastName
+                                }}</div>
+                            <div class="text-body-2 mb-2 text-center">
+                                {{ formatDisplayDate(selectedImageData.clock_date) }} {{ selectedImageData.clock_time }}
+                            </div>
+                            <div class="text-caption text-medium-emphasis mb-3 text-center">
+                                {{ getImageFileName(selectedImageData.image) }}
+                            </div>
+
+                            <!-- Chips en el dialog -->
+                            <div class="d-flex justify-center flex-wrap mb-3">
+                                <v-chip v-if="selectedImageData.type_of_clock" class="mr-1 mb-1"
+                                    :color="getChipColor(selectedImageData.type_of_clock)" small>
+                                    {{ formatClockType(selectedImageData.type_of_clock) }}
+                                </v-chip>
+                                <v-chip :color="getStatusColor(selectedImageData.activity_status)" small class="mb-1">
+                                    {{ selectedImageData.activity_status }}
+                                </v-chip>
+                            </div>
+
+                            <!-- Barra de progreso en el dialog - SOLO si NO es clock_in o clock_out -->
+                            <div v-if="shouldShowProgressBar(selectedImageData)" class="mt-3">
+                                <div class="d-flex justify-space-between align-center mb-1">
+                                    <span class="text-body-2">Active Time:</span>
+                                    <span class="text-body-2 font-weight-bold">{{
+                                        calculatePercentage(selectedImageData.active_time)
+                                        }}%</span>
+                                </div>
+                                <v-progress-linear :model-value="calculatePercentage(selectedImageData.active_time)"
+                                    :color="getProgressColor(calculatePercentage(selectedImageData.active_time))" height="10"
+                                    rounded class="mb-1"></v-progress-linear>
+                                <div class="text-caption text-medium-emphasis text-center">
+                                    {{ selectedImageData.active_time }} seconds / 300 seconds
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </v-card-text>
@@ -247,6 +256,22 @@ const endDate = ref<string>('')
 const hasSearched = ref(false)
 const selectedImageData = ref<ScreenshotImage | null>(null)
 const debugMode = ref(false)
+
+// ✅ COMPUTED PROPERTIES PARA EL DIÁLOGO RESPONSIVE
+const dialogMaxWidth = computed(() => {
+    // Para pantallas grandes, usar 90% del viewport, pero con un máximo de 1200px
+    return 'min(90vw, 1200px)'
+})
+
+const imageMaxHeight = computed(() => {
+    // Para pantallas móviles, usar 60% del viewport, para desktop 70%
+    return '70vh'
+})
+
+const imageMaxWidth = computed(() => {
+    // Limitar el ancho máximo de la imagen
+    return 'min(85vw, 1000px)'
+})
 
 // ✅ FUNCIÓN PARA DETERMINAR SI MOSTRAR LA BARRA DE PROGRESO
 const shouldShowProgressBar = (image: ScreenshotImage | null): boolean => {
@@ -571,20 +596,36 @@ watch(dialog, (newVal) => {
 .image-dialog {
     border-radius: 12px;
     position: relative;
+    overflow: hidden;
 }
 
-.image-container {
+.dialog-content {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+.image-section {
+    flex: 1;
     display: flex;
     justify-content: center;
     align-items: center;
     padding: 16px;
     background-color: #f5f5f5;
-    min-height: 400px;
+    min-height: 300px;
+    max-height: 70vh;
 }
 
 .dialog-image {
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    object-fit: contain;
+}
+
+.info-section {
+    flex-shrink: 0;
+    background-color: white;
+    border-top: 1px solid #e0e0e0;
 }
 
 .image-placeholder {
@@ -606,22 +647,51 @@ watch(dialog, (newVal) => {
     border-radius: 4px;
 }
 
+/* Responsive adjustments */
 @media (max-width: 600px) {
     .image-container {
-        padding: 10px;
-        min-height: 300px;
+        padding: 8px;
+        min-height: 250px;
     }
 
     .screenshot-card {
-        border-radius: 8px;
+        border-radius: 6px;
     }
 
     .title {
         font-size: 20px;
     }
+
+    .image-section {
+        padding: 12px;
+        min-height: 250px;
+        max-height: 60vh;
+    }
+
+    .info-section {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 960px) {
+    .image-section {
+        max-height: 65vh;
+    }
 }
 
 .v-alert {
     border-radius: 8px;
+}
+
+/* Ensure dialog is properly sized on all screens */
+:deep(.v-dialog--fullscreen) {
+    .image-section {
+        max-height: calc(100vh - 200px) !important;
+    }
+    
+    .info-section {
+        max-height: 200px;
+        overflow-y: auto;
+    }
 }
 </style>

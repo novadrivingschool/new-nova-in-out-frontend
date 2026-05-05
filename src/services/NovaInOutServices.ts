@@ -3,68 +3,60 @@
 import axios from 'axios'
 import { useAuth } from '@/stores/auth/useAuth'
 
-const API_AUTH_URL = import.meta.env.VITE_API_AUTH_URL || 'http://localhost:5013'
-const API_NOVA_IN_OUT_URL = import.meta.env.VITE_API_NOVA_IN_OUT_URL || 'http://localhost:5015'
+// ✅ Las constantes se leen aquí — Vite las inyecta en build time,
+//    no dependen de Pinia ni del ciclo de vida de Vue.
+const API_AUTH_URL       = import.meta.env.VITE_API_AUTH_URL       || 'http://localhost:5013'
+const API_NOVA_IN_OUT_URL = import.meta.env.VITE_API_NOVA_IN_OUT_URL || 'http://localhost:5017'
 
-const authStore = useAuth()
+console.log('🚀 [NovaInOutServices] Servicio cargado')
+console.log(`🔗 [NovaInOutServices] URL Auth:       ${API_AUTH_URL}`)
+console.log(`🔗 [NovaInOutServices] URL Nova In Out: ${API_NOVA_IN_OUT_URL}`)
 
-/**
- * Obtiene el token de autenticación desde Pinia
- * @returns {string} Token de acceso JWT
- */
-const getAuthToken = () => {
-  const token = authStore.accessToken
-  console.log('🔐 [getAuthToken] Token obtenido del store:', token ? '✓ Presente' : '✗ Ausente')
-  return token
-}
+// ✅ useAuth() se llama DENTRO de cada función, nunca en el módulo raíz.
+//    Llamarlo fuera de un componente/store hace que Pinia no esté activo
+//    todavía y rompe la inicialización completa del módulo.
 
 /**
- * Interceptor de Axios para agregar automáticamente el token de autorización a todas las solicitudes
+ * Interceptor de Axios — agrega el Bearer token en cada request
  */
 axios.interceptors.request.use(
-  async (config) => {
-    const token = getAuthToken()
+  (config) => {
+    const token = useAuth().accessToken   // ← useAuth() aquí, Pinia ya está listo
     if (token) {
       config.headers['Authorization'] = `Bearer ${token}`
-      console.log(`🚀 [Request Interceptor] Token agregado a la solicitud: ${config.method?.toUpperCase()} ${config.url}`)
+      console.log(`🚀 [Request] ${config.method?.toUpperCase()} ${config.url}`)
     }
     return config
   },
   (error) => {
-    console.error('❌ [Request Interceptor] Error en la configuración de la solicitud:', error)
+    console.error('❌ [Request] Error de configuración:', error)
     return Promise.reject(error)
   }
 )
 
 /**
- * Interceptor de Axios para manejar respuestas y errores, especialmente errores 401 (Unauthorized)
+ * Interceptor de Axios — maneja 401 refrescando el token y reintentando
  */
 axios.interceptors.response.use(
-  response => {
-    console.log(`✅ [Response Interceptor] Solicitud exitosa: ${response.config.method?.toUpperCase()} ${response.config.url} - Status: ${response.status}`)
+  (response) => {
+    console.log(`✅ [Response] ${response.config.method?.toUpperCase()} ${response.config.url} → ${response.status}`)
     return response
-  }, 
+  },
   async (error) => {
-    console.error(`❌ [Response Interceptor] Error en la respuesta: ${error.config?.method?.toUpperCase()} ${error.config?.url} - Status: ${error.response?.status}`)
-    
-    if (error.response && error.response.status === 401 && !error.config.__isRetryRequest) {
-      console.log('🔄 [Response Interceptor] Detectado error 401 - Intentando refrescar token...')
-      
+    console.error(`❌ [Response] ${error.config?.method?.toUpperCase()} ${error.config?.url} → ${error.response?.status}`)
+
+    if (error.response?.status === 401 && !error.config.__isRetryRequest) {
       error.config.__isRetryRequest = true
+      const auth = useAuth()   // ← useAuth() aquí también
       try {
-        console.log('🔄 [Response Interceptor] Ejecutando refreshNow()...')
-        await authStore.refreshNow()
-        
-        const newToken = getAuthToken()
-        console.log('🔄 [Response Interceptor] Token refrescado exitosamente')
-        
-        error.config.headers['Authorization'] = `Bearer ${newToken}`
-        console.log(`🔄 [Response Interceptor] Reintentando solicitud: ${error.config.method?.toUpperCase()} ${error.config.url}`)
+        console.log('🔄 [Response] 401 detectado — refrescando token...')
+        await auth.refreshNow()
+        error.config.headers['Authorization'] = `Bearer ${auth.accessToken}`
+        console.log('🔄 [Response] Reintentando request...')
         return axios(error.config)
       } catch (e) {
-        console.error('❌ [Response Interceptor] Falló el refresh del token:', e)
-        console.log('🚪 [Response Interceptor] Ejecutando logout...')
-        await authStore.logout()
+        console.error('❌ [Response] Refresh falló — haciendo logout')
+        await auth.logout()
         throw e
       }
     }
@@ -159,9 +151,5 @@ const NovaInOutServices = {
     }
   }
 }
-
-console.log('🚀 [NovaInOutServices] Servicio inicializado correctamente')
-console.log(`🔗 [NovaInOutServices] URL Auth: ${API_AUTH_URL}`)
-console.log(`🔗 [NovaInOutServices] URL Nova In Out: ${API_NOVA_IN_OUT_URL}`)
 
 export default NovaInOutServices

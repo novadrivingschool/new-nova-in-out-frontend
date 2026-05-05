@@ -3,7 +3,7 @@ import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestCo
 
 const LS_ACCESS = "novaio_accessToken"
 const LS_REFRESH = "novaio_refreshToken"
-const API_BASE = import.meta.env.VITE_AUTH_API_URL || "http://localhost:5013"
+const API_BASE = import.meta.env.VITE_API_AUTH_URL || "http://localhost:5013"
 
 const log = (...a: any[]) => console.log("[HTTP]", ...a)
 

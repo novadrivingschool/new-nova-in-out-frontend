@@ -1,6 +1,12 @@
 <template>
-  <v-container>
-    <h2 class="mb-4">Editar formulario</h2>
+  <v-container fluid class="app-page">
+    <div class="app-page-header">
+      <div>
+        <h1 class="app-page-title">Edit form</h1>
+        <div class="app-page-subtitle">Update fields and configuration</div>
+      </div>
+    </div>
+
     <FormBuilder :form-id="id" />
   </v-container>
 </template>
@@ -9,8 +15,6 @@
 import { useRoute } from 'vue-router/auto';
 import FormBuilder from '@/components/DynamicForm/FormBuilder.vue';
 
-// 🔒 Tipamos la ruta por su path de archivo:
 const route = useRoute('/Dynamic-Forms/[id]/edit');
-// Aquí TS ya sabe que params = { id: string }
 const id = route.params.id;
 </script>

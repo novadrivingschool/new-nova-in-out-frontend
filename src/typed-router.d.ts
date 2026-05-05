@@ -34,6 +34,7 @@ declare module 'vue-router/auto-routes' {
     '/Instructor-Calendar/': RouteRecordInfo<'/Instructor-Calendar/', '/Instructor-Calendar', Record<never, never>, Record<never, never>>,
     '/Instructors/': RouteRecordInfo<'/Instructors/', '/Instructors', Record<never, never>, Record<never, never>>,
     '/Leads/': RouteRecordInfo<'/Leads/', '/Leads', Record<never, never>, Record<never, never>>,
+    '/Live-Staff-Activity/': RouteRecordInfo<'/Live-Staff-Activity/', '/Live-Staff-Activity', Record<never, never>, Record<never, never>>,
     '/Locations/': RouteRecordInfo<'/Locations/', '/Locations', Record<never, never>, Record<never, never>>,
     '/NotSoldReasons/': RouteRecordInfo<'/NotSoldReasons/', '/NotSoldReasons', Record<never, never>, Record<never, never>>,
     '/Payment/': RouteRecordInfo<'/Payment/', '/Payment', Record<never, never>, Record<never, never>>,

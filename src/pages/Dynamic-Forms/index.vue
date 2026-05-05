@@ -1,6 +1,12 @@
 <template>
-    <v-container>
-        <h2 class="mb-4">Nuevo formulario</h2>
+    <v-container fluid class="app-page">
+        <div class="app-page-header">
+            <div>
+                <h1 class="app-page-title">New form</h1>
+                <div class="app-page-subtitle">Build a custom dynamic form</div>
+            </div>
+        </div>
+
         <FormBuilder @saved="goEdit" />
     </v-container>
 </template>

@@ -1,9 +1,13 @@
 <template>
-    <v-container class="py-8" style="max-width: 880px;">
-        <v-card elevation="2" class="pa-6 rounded-lg">
-            <v-card-title class="text-h6 font-weight-bold mb-4 text-primary">
-                New Record
-            </v-card-title>
+    <v-container fluid class="app-page" style="max-width: 960px;">
+        <div class="app-page-header">
+            <div>
+                <h1 class="app-page-title">New Record</h1>
+                <div class="app-page-subtitle">Create a new lead, contact or deal</div>
+            </div>
+        </div>
+
+        <v-card class="app-card pa-5 pa-sm-6" elevation="0">
 
             <v-form @submit.prevent="handleSave" ref="formRef" v-model="isValid">
                 <v-row dense>
@@ -164,8 +168,4 @@ const onReminderChange = (date: string) => {
 </script>
 
 <style scoped>
-.v-card-title {
-    padding-bottom: 16px;
-    border-bottom: 1px solid #444;
-}
 </style>

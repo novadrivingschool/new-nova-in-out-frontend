@@ -7,45 +7,147 @@
 }</route>
 
 <template>
-    <v-container fluid class="login-screen d-flex align-center justify-center">
-        <v-card class="pa-8 login-card" width="580" elevation="4">
-            <!-- Logo + título -->
-            <!-- Header horizontal -->
-            <!-- Header con 2 líneas -->
-            <!-- Header con 2 líneas alineadas a la izquierda -->
-            <div class="logo-header mb-6">
-                <div class="logo-title-row">
-                    <v-img :src="logoUrl" alt="Nova IO logo" width="148" height="148" class="logo-img" contain eager />
-                    <h2 class="nova-title">NOVA IO</h2>
+    <v-container fluid class="login-screen pa-0">
+        <!-- Decoración de fondo -->
+        <div class="login-blob login-blob--one" aria-hidden="true" />
+        <div class="login-blob login-blob--two" aria-hidden="true" />
+
+        <v-row class="ma-0 fill-height" no-gutters>
+            <!-- Panel izquierdo: branding (oculto en mobile) -->
+            <v-col
+                cols="12"
+                md="6"
+                class="d-none d-md-flex login-hero pa-10 flex-column justify-space-between"
+            >
+                <div class="d-flex align-center ga-3">
+                    <v-img
+                        :src="logoUrl"
+                        alt="Nova IO logo"
+                        width="56"
+                        height="56"
+                        class="login-hero-logo"
+                        contain
+                        eager
+                    />
+                    <div>
+                        <div class="text-h6 font-weight-bold" style="line-height: 1;">NOVA IO</div>
+                        <div class="text-caption text-medium-emphasis">Nova in out</div>
+                    </div>
                 </div>
-                <p class="nova-subtitle">
-                    <strong class="highlight">Nova in out</strong> Empowering your workflow
-                </p>
-            </div>
 
-
-
-            <!-- Formulario -->
-            <v-form @submit.prevent="handleLogin" class="mt-6">
-                <div class="form-fields">
-                    <v-text-field v-model="email" label="Email" variant="underlined" density="comfortable"
-                        class="mb-4 minimal-input" hide-details type="email" autocomplete="email" />
-                    <v-text-field v-model="password" :type="showPassword ? 'text' : 'password'" label="Password"
-                        variant="underlined" density="comfortable" class="mb-6 minimal-input" hide-details
-                        autocomplete="current-password" :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
-                        @click:append-inner="showPassword = !showPassword" @keyup.enter="handleLogin" />
+                <div class="login-hero-pitch">
+                    <h1 class="text-h3 font-weight-bold mb-4" style="letter-spacing: -0.02em;">
+                        Empowering<br />your workflow.
+                    </h1>
+                    <p class="text-body-1 text-medium-emphasis" style="max-width: 440px;">
+                        Manage your driving school operations — leads, contacts, deals,
+                        instructors and calendars — from a single place.
+                    </p>
                 </div>
 
-                <v-btn type="submit" :loading="auth.loading" :disabled="!canSubmit" color="#2d2d2d" class="custom-btn"
-                    block rounded>
-                    Sign In
-                </v-btn>
+                <div class="text-caption text-medium-emphasis">
+                    © {{ new Date().getFullYear() }} Nova Driving School
+                </div>
+            </v-col>
 
-                <v-alert v-if="auth.error" type="error" variant="tonal" class="mt-3" density="compact">
-                    {{ auth.error }}
-                </v-alert>
-            </v-form>
-        </v-card>
+            <!-- Panel derecho: formulario -->
+            <v-col
+                cols="12"
+                md="6"
+                class="d-flex align-center justify-center pa-4 pa-sm-8"
+            >
+                <v-card
+                    class="login-card pa-6 pa-sm-8"
+                    :max-width="460"
+                    width="100%"
+                    elevation="0"
+                >
+                    <!-- Header móvil -->
+                    <div class="d-flex d-md-none align-center justify-center ga-3 mb-6">
+                        <v-img
+                            :src="logoUrl"
+                            alt="Nova IO logo"
+                            width="48"
+                            height="48"
+                            contain
+                            eager
+                        />
+                        <div class="text-h6 font-weight-bold">NOVA IO</div>
+                    </div>
+
+                    <div class="mb-6">
+                        <h2 class="text-h5 font-weight-bold mb-1" style="letter-spacing: -0.01em;">
+                            Welcome back
+                        </h2>
+                        <p class="text-body-2 text-medium-emphasis ma-0">
+                            Sign in to continue to your dashboard.
+                        </p>
+                    </div>
+
+                    <v-form @submit.prevent="handleLogin">
+                        <v-text-field
+                            v-model="email"
+                            label="Email"
+                            type="email"
+                            autocomplete="email"
+                            prepend-inner-icon="mdi-email-outline"
+                            class="mb-4"
+                            density="comfortable"
+                            variant="outlined"
+                            hide-details="auto"
+                        />
+
+                        <v-text-field
+                            v-model="password"
+                            :type="showPassword ? 'text' : 'password'"
+                            label="Password"
+                            autocomplete="current-password"
+                            prepend-inner-icon="mdi-lock-outline"
+                            :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                            class="mb-2"
+                            density="comfortable"
+                            variant="outlined"
+                            hide-details="auto"
+                            @click:append-inner="showPassword = !showPassword"
+                            @keyup.enter="handleLogin"
+                        />
+
+                        <div class="d-flex align-center justify-end mb-4">
+                            <a class="text-caption text-primary" href="#" @click.prevent>
+                                Forgot password?
+                            </a>
+                        </div>
+
+                        <v-btn
+                            type="submit"
+                            :loading="auth.loading"
+                            :disabled="!canSubmit"
+                            color="primary"
+                            size="large"
+                            block
+                            rounded="lg"
+                            class="font-weight-bold"
+                        >
+                            Sign In
+                            <template #append>
+                                <v-icon size="20">mdi-arrow-right</v-icon>
+                            </template>
+                        </v-btn>
+
+                        <v-alert
+                            v-if="auth.error"
+                            type="error"
+                            variant="tonal"
+                            class="mt-4"
+                            density="compact"
+                            rounded="lg"
+                        >
+                            {{ auth.error }}
+                        </v-alert>
+                    </v-form>
+                </v-card>
+            </v-col>
+        </v-row>
     </v-container>
 </template>
 
@@ -54,7 +156,6 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useAuth } from '@/stores/auth/useAuth'
 
-// ✅ Importa el logo para que siempre se resuelva bien la ruta
 import logoUrl from '@/assets/Logos/Logocarro.png'
 
 const router = useRouter()
@@ -78,127 +179,67 @@ const handleLogin = async () => {
 </script>
 
 <style scoped>
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&display=swap');
-
 .login-screen {
     min-height: 100vh;
-    background-color: #121212;
-    padding: 0;
+    position: relative;
+    overflow: hidden;
+    background-color: rgb(var(--v-theme-background));
+}
+
+/* Decoración: gradientes circulares suaves */
+.login-blob {
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(80px);
+    opacity: 0.45;
+    pointer-events: none;
+    z-index: 0;
+}
+.login-blob--one {
+    width: 480px;
+    height: 480px;
+    top: -160px;
+    left: -160px;
+    background: radial-gradient(circle, rgb(var(--v-theme-primary)) 0%, transparent 70%);
+}
+.login-blob--two {
+    width: 520px;
+    height: 520px;
+    bottom: -200px;
+    right: -180px;
+    background: radial-gradient(circle, rgb(var(--v-theme-accent)) 0%, transparent 70%);
+}
+.v-theme--dark .login-blob {
+    opacity: 0.25;
+}
+
+.login-hero {
+    position: relative;
+    z-index: 1;
+}
+
+.login-hero-logo {
+    border-radius: 12px;
+}
+
+.login-hero-pitch h1 {
+    color: rgb(var(--v-theme-on-surface));
 }
 
 .login-card {
-    background-color: #1f1f1f;
-    border-radius: 16px;
+    position: relative;
+    z-index: 1;
+    border-radius: 20px !important;
+    border: 1px solid rgb(var(--v-theme-surface-variant)) !important;
+    background-color: rgb(var(--v-theme-surface)) !important;
+    box-shadow: 0 20px 50px -20px rgba(15, 23, 42, 0.25) !important;
 }
 
-.minimal-input .v-field {
-    background-color: transparent !important;
-    border-bottom: 1px solid #555;
-    border-radius: 0;
+.v-theme--dark .login-card {
+    box-shadow: 0 20px 50px -20px rgba(0, 0, 0, 0.6) !important;
 }
 
-.minimal-input .v-label {
-    color: white !important;
+a {
+    text-decoration: none;
 }
-
-.minimal-input input {
-    color: white !important;
-}
-
-.minimal-input :deep(.v-field__input) {
-    color: #fff !important;
-    caret-color: #fff !important;
-}
-
-.minimal-input :deep(.v-field-label),
-.minimal-input :deep(.v-icon) {
-    color: #fff !important;
-}
-
-.minimal-input :deep(.v-field__outline),
-.minimal-input :deep(.v-field__overlay) {
-    border-color: rgba(255, 255, 255, 0.7) !important;
-    background: transparent !important;
-}
-
-.v-input__control {
-    color: white !important;
-}
-
-.custom-btn {
-    color: white;
-    background-color: #2d2d2d;
-    transition: background-color 0.3s ease;
-}
-
-.custom-btn:hover {
-    background-color: #3a3a3a;
-}
-
-/* Header */
-.logo-section {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-}
-
-/* .nova-title {
-    font-size: 2.5rem;
-    font-weight: 700;
-    margin: 0;
-    font-family: 'Space Grotesk', sans-serif;
-    color: #fff;
-} */
-
-/* .nova-subtitle {
-    font-size: 0.95rem;
-    color: #b0b0b0;
-    margin-top: 4px;
-} */
-
-.logo-header {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    /* 👈 alinea todo a la izquierda */
-    text-align: left;
-}
-
-.logo-title-row {
-    display: flex;
-    align-items: center;
-    justify-content: flex-start;
-    /* 👈 alinea logo + título a la izquierda */
-    gap: 10px;
-}
-
-.logo-img {
-    border-radius: 8px;
-}
-
-.nova-title {
-    font-size: 6rem;
-    font-weight: 700;
-    margin: 0;
-    font-family: 'Space Grotesk', sans-serif;
-    color: #fff;
-}
-
-.nova-subtitle {
-    font-size: 1rem;
-    color: #b0b0b0;
-    margin-top: 6px;
-}
-
-.highlight {
-    color: #fff;
-    font-weight: 600;
-}
-
-.form-fields {
-  max-width: 280px;   /* 👈 ancho controlado */
-  margin-left: 0;     /* 👈 alinea a la izquierda */
-}
-
-
 </style>

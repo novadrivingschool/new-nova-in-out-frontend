@@ -1,43 +1,72 @@
 <template>
-  <v-container>
-    <v-card elevation="2">
-      <v-card-title class="d-flex justify-space-between align-center">
-        <span class="text-h6">Programs</span>
-        <v-btn color="primary" @click="openAddDialog" size="small">
-          Add Program
-        </v-btn>
-      </v-card-title>
+  <v-container fluid class="app-page">
+    <div class="app-page-header">
+      <div>
+        <h1 class="app-page-title">Programs</h1>
+        <div class="app-page-subtitle">
+          {{ programs.length }} {{ programs.length === 1 ? 'program' : 'programs' }} configured
+        </div>
+      </div>
 
-      <v-data-table :headers="headers" :items="programs" class="elevation-1" item-value="id" density="comfortable">
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="openAddDialog">
+        Add Program
+      </v-btn>
+    </div>
+
+    <v-card class="app-card" elevation="0">
+      <v-data-table
+        :headers="headers"
+        :items="programs"
+        class="app-table"
+        item-value="id"
+        density="comfortable"
+      >
         <template #item.price="{ item }">
-          ${{ item.price.toFixed(2) }}
+          <span class="font-weight-bold">${{ item.price.toFixed(2) }}</span>
         </template>
         <template #item.actions="{ item }">
-          <v-icon class="mr-2" style="cursor: pointer;" @click="openEditDialog(item)" title="Edit">
-            mdi-pencil
-          </v-icon>
-          <v-icon color="red" style="cursor: pointer;" @click="handleDelete(item.id)" title="Delete">
-            mdi-delete
-          </v-icon>
+          <div class="d-flex align-center ga-1">
+            <v-tooltip text="Edit" location="top">
+              <template #activator="{ props }">
+                <v-btn v-bind="props" icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" @click="openEditDialog(item)" />
+              </template>
+            </v-tooltip>
+            <v-tooltip text="Delete" location="top">
+              <template #activator="{ props }">
+                <v-btn v-bind="props" icon="mdi-delete-outline" size="x-small" variant="text" color="error" @click="handleDelete(item.id)" />
+              </template>
+            </v-tooltip>
+          </div>
+        </template>
+        <template #no-data>
+          <div class="app-empty-state py-8">
+            <v-icon>mdi-school-outline</v-icon>
+            <div class="text-subtitle-2 font-weight-medium">No programs yet</div>
+            <div class="text-body-2 mt-1">Click “Add Program” to create the first one.</div>
+          </div>
         </template>
       </v-data-table>
     </v-card>
 
-    <v-dialog v-model="showDialog" max-width="500">
-      <v-card>
-        <v-card-title class="text-h6">
-          {{ isEditing ? 'Edit Program' : 'New Program' }}
+    <v-dialog v-model="showDialog" max-width="500" persistent>
+      <v-card class="pa-2">
+        <v-card-title class="d-flex align-center ga-2">
+          <v-icon color="primary">{{ isEditing ? 'mdi-pencil-outline' : 'mdi-plus-circle-outline' }}</v-icon>
+          <span>{{ isEditing ? 'Edit Program' : 'New Program' }}</span>
+          <v-spacer />
+          <v-btn icon="mdi-close" variant="text" size="small" @click="showDialog = false" />
         </v-card-title>
-        <v-card-text>
-          <v-form @submit.prevent="handleSave" ref="formRef">
+        <v-card-text class="pt-4">
+          <v-form @submit.prevent="handleSave" ref="formRef" class="d-flex flex-column ga-4">
             <v-text-field v-model="editedProgram.name" label="Name" required />
-            <v-textarea v-model="editedProgram.description" label="Description" required />
-            <v-text-field v-model.number="editedProgram.price" label="Price" type="number" required />
+            <v-textarea v-model="editedProgram.description" label="Description" rows="3" auto-grow required />
+            <v-text-field v-model.number="editedProgram.price" label="Price" type="number" prefix="$" required />
           </v-form>
         </v-card-text>
-        <v-card-actions class="justify-end">
-          <v-btn text @click="showDialog = false">Cancel</v-btn>
-          <v-btn color="primary" @click="handleSave">
+        <v-card-actions class="px-6 pb-4 ga-2">
+          <v-spacer />
+          <v-btn variant="text" @click="showDialog = false">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" @click="handleSave">
             {{ isEditing ? 'Update' : 'Save' }}
           </v-btn>
         </v-card-actions>
@@ -60,15 +89,14 @@ watchEffect(() => {
   }
 })
 
-//const programs = programsStore.programs
 const programs = computed(() => programsStore.programs)
 
 const headers = [
-  { title: 'ID', key: 'id' },
+  { title: 'ID', key: 'id', width: 80 },
   { title: 'Name', key: 'name' },
   { title: 'Description', key: 'description' },
-  { title: 'Price', key: 'price' },
-  { title: 'Actions', key: 'actions', sortable: false },
+  { title: 'Price', key: 'price', align: 'end' as const },
+  { title: 'Actions', key: 'actions', sortable: false, align: 'end' as const, width: 120 },
 ]
 
 const showDialog = ref(false)

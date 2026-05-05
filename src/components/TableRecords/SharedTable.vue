@@ -1,79 +1,74 @@
 <template>
-    <v-container fluid class="pa-0">
-        <v-card elevation="2" class="mx-4 my-6" style="max-width: 100%;">
-            <v-card-title class="d-flex justify-space-between align-center">
-                <span class="text-h6">{{ title }}</span>
-            </v-card-title>
-
-            <!-- FILTER -->
-            <v-card class="mx-4 mt-4 mb-2 pa-4" elevation="5" rounded="lg" :style="{
-                backgroundColor: $vuetify.theme.current.dark ? '#161B22' : undefined,
-                border: $vuetify.theme.current.dark ? '1px solid #30363d' : '1px solid #e0e0e0'
-            }">
-
-                <div class="d-flex align-center mb-4" style="gap: 8px;">
-                    <v-icon color="primary">mdi-filter-variant</v-icon>
-                    <span class="text-subtitle-1 font-weight-medium">Filters</span>
+    <v-container fluid class="app-page">
+        <!-- HEADER de página -->
+        <div class="app-page-header">
+            <div>
+                <h1 class="app-page-title">{{ title }}</h1>
+                <div class="app-page-subtitle">
+                    {{ filteredItems.length }} {{ filteredItems.length === 1 ? 'record' : 'records' }}
                 </div>
+            </div>
 
-                <div class="d-flex flex-wrap" style="gap: 12px;">
-                    <v-select v-model="selectedStatus" :items="statusOptions" label="Status" clearable
-                        density="comfortable" variant="outlined" hide-details="auto" style="width: 180px;" />
-
-                    <v-select v-model="selectedLocation" :items="locations.map(l => l.name)" label="Location" clearable
-                        density="comfortable" variant="outlined" hide-details="auto" style="width: 180px;" />
-
-                    <v-select v-model="selectedSource" :items="sources.map(s => s.name)" label="Source" clearable
-                        density="comfortable" variant="outlined" hide-details="auto" style="width: 180px;" />
-
-                    <v-select v-model="selectedEmployee" :items="Array.from(new Set(
-                        props.items.flatMap(i =>
-                            (i.assignedTo as EmployeeData[]).map((emp: EmployeeData) => emp.employeeNumber)
-                        )
-                    ))" label="Assigned To" clearable density="comfortable" variant="outlined" hide-details="auto"
-                        style="width: 180px;" />
-
-                    <v-select v-model="selectedProgram" :items="programs.map(p => ({ title: p.name, value: p.id }))"
-                        label="Program Sold" clearable density="comfortable" variant="outlined" hide-details="auto"
-                        style="width: 180px;" />
-
-                    <v-select v-model="showOnlyWithFollowUp" :items="[
-                        { title: 'With Follow-up', value: true },
-                        { title: 'Without Follow-up', value: false }
-                    ]" label="Follow-up" clearable density="comfortable" variant="outlined" hide-details="auto"
-                        style="width: 180px;" />
-
-                    <v-btn color="primary" class="align-self-end" @click="applyFilters">
-                        Apply
-                    </v-btn>
-                </div>
-            </v-card>
-
-            <v-card-actions class="justify-end px-4 pt-0 pb-2 mt-8" style="gap: 12px;">
+            <div class="app-toolbar">
                 <!-- Toggle vista -->
-                <v-btn-toggle v-model="viewMode" mandatory density="comfortable" divided>
-                    <v-btn value="table" :variant="viewMode === 'table' ? 'flat' : 'text'">
+                <v-btn-toggle v-model="viewMode" mandatory density="comfortable" divided rounded="lg" color="primary" variant="outlined">
+                    <v-btn value="table" size="small">
                         <v-icon start icon="mdi-table" /> Table
                     </v-btn>
-                    <v-btn value="card" :variant="viewMode === 'card' ? 'flat' : 'text'">
+                    <v-btn value="card" size="small">
                         <v-icon start icon="mdi-view-grid" /> Cards
                     </v-btn>
                 </v-btn-toggle>
 
-                <!-- Refresh -->
-                <v-btn variant="text" density="comfortable" @click="refresh">
-                    <v-icon start small>mdi-refresh</v-icon>
+                <v-btn variant="text" density="comfortable" prepend-icon="mdi-refresh" @click="refresh">
                     Refresh
                 </v-btn>
 
-                <!-- Add new -->
-                <v-btn color="primary" density="comfortable" @click="openAddDialog">
+                <v-btn color="primary" prepend-icon="mdi-plus" @click="openAddDialog">
                     Add New
                 </v-btn>
-            </v-card-actions>
+            </div>
+        </div>
+
+        <!-- FILTROS -->
+        <v-card class="app-card mb-5 pa-4 pa-sm-5" elevation="0">
+            <div class="d-flex align-center ga-2 mb-4">
+                <v-icon color="primary" size="20">mdi-filter-variant</v-icon>
+                <span class="text-subtitle-2 font-weight-bold">Filters</span>
+                <v-spacer />
+                <v-btn
+                    variant="text"
+                    size="small"
+                    @click="applyFilters"
+                    color="primary"
+                >
+                    Apply
+                </v-btn>
+            </div>
+
+            <div class="filter-grid">
+                <v-select v-model="selectedStatus" :items="statusOptions" label="Status" clearable />
+                <v-select v-model="selectedLocation" :items="locations.map(l => l.name)" label="Location" clearable />
+                <v-select v-model="selectedSource" :items="sources.map(s => s.name)" label="Source" clearable />
+                <v-select v-model="selectedEmployee" :items="Array.from(new Set(
+                    props.items.flatMap(i =>
+                        (i.assignedTo as EmployeeData[]).map((emp: EmployeeData) => emp.employeeNumber)
+                    )
+                ))" label="Assigned To" clearable />
+                <v-select v-model="selectedProgram" :items="programs.map(p => ({ title: p.name, value: p.id }))"
+                    label="Program Sold" clearable />
+                <v-select v-model="showOnlyWithFollowUp" :items="[
+                    { title: 'With Follow-up', value: true },
+                    { title: 'Without Follow-up', value: false }
+                ]" label="Follow-up" clearable />
+            </div>
+        </v-card>
+
+        <!-- CONTENIDO -->
+        <v-card class="app-card" elevation="0">
 
 
-            <v-data-table v-if="viewMode === 'table'" :headers="headers" :items="filteredItems" class="elevation-1"
+            <v-data-table v-if="viewMode === 'table'" :headers="headers" :items="filteredItems" class="app-table"
                 item-value="id" density="comfortable">
                 <!-- Leads table custom columns -->
                 <template #item.fullName="{ item }">
@@ -121,22 +116,23 @@
 
                 <!-- ACTIONS COLUMN -->
                 <template #item.actions="{ item }">
-                    <div class="d-flex align-center gap-2">
-                        <v-icon class="cursor-pointer text-primary" @click="editItem(item)" title="Edit">
-                            mdi-pencil
-                        </v-icon>
-                        <v-icon class="cursor-pointer text-error" @click="deleteItem(item)" title="Delete">
-                            mdi-delete
-                        </v-icon>
+                    <div class="d-flex align-center ga-1">
+                        <v-tooltip text="Edit" location="top">
+                            <template #activator="{ props }">
+                                <v-btn v-bind="props" icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" @click="editItem(item)" />
+                            </template>
+                        </v-tooltip>
+                        <v-tooltip text="Delete" location="top">
+                            <template #activator="{ props }">
+                                <v-btn v-bind="props" icon="mdi-delete-outline" size="x-small" variant="text" color="error" @click="deleteItem(item)" />
+                            </template>
+                        </v-tooltip>
 
-                        <!-- CONVERT MENU WITH ICON -->
                         <v-menu>
                             <template #activator="{ props }">
-                                <v-icon class="cursor-pointer text-secondary" v-bind="props" title="Convert">
-                                    mdi-compare-horizontal
-                                </v-icon>
+                                <v-btn v-bind="props" icon="mdi-compare-horizontal" size="x-small" variant="text" title="Convert" />
                             </template>
-                            <v-list>
+                            <v-list density="compact">
                                 <v-list-item @click="convertItem(item, 'CONTACT')">
                                     <v-list-item-title>Convert to Contact</v-list-item-title>
                                 </v-list-item>
@@ -155,181 +151,224 @@
                 </template>
 
                 <template #item.status="{ item }">
-                    <v-chip :color="getStatusColor(item)" text-color="white" small>
+                    <v-chip :color="getStatusColor(item)" variant="tonal" size="small" class="font-weight-bold">
                         {{ getStatusLabel(item) }}
                     </v-chip>
+                </template>
+
+                <template #item.type="{ item }">
+                    <v-chip :color="getTypeColor(item.type)" variant="tonal" size="small" class="text-uppercase font-weight-bold">
+                        {{ item.type || '—' }}
+                    </v-chip>
+                </template>
+
+                <template #no-data>
+                    <div class="app-empty-state py-8">
+                        <v-icon>mdi-inbox-outline</v-icon>
+                        <div class="text-subtitle-2 font-weight-medium">No records to show</div>
+                        <div class="text-body-2 mt-1">Try adjusting your filters or add a new record.</div>
+                    </div>
                 </template>
             </v-data-table>
 
             <!-- VISTA TIPO CARDS -->
-            <v-row v-if="viewMode === 'card'" class="px-4 pb-4" dense>
-                <v-col v-for="item in filteredItems" :key="item.id" cols="12" sm="6" md="4" lg="3">
-                    <v-card class="pa-4 fill-height d-flex flex-column justify-space-between" elevation="5" rounded="lg"
-                        :style="{
-                            backgroundColor: $vuetify.theme.current.dark ? '#161B22' : undefined,
-                            border: $vuetify.theme.current.dark ? '1px solid #30363d' : '1px solid #e0e0e0'
-                        }">
-                        <!-- TYPE + STATUS como header visual -->
-                        <div class="d-flex justify-space-between align-center mb-6" style="gap: 12px;">
-                            <div class="d-flex align-center" style="gap: 12px;">
-                                <!-- Type Chip -->
-                                <v-chip :color="getTypeColor(item.type)"
-                                    class="text-uppercase font-weight-bold text-white px-4 py-1"
-                                    style="font-size: 1.15rem; height: auto;">
-                                    {{ item.type || '—' }}
-                                </v-chip>
+            <div v-if="viewMode === 'card'" class="pa-4 pa-sm-5">
+                <div v-if="filteredItems.length === 0" class="app-empty-state">
+                    <v-icon>mdi-inbox-outline</v-icon>
+                    <div class="text-subtitle-1 font-weight-medium">No records to show</div>
+                    <div class="text-body-2 mt-1">Try adjusting your filters or add a new record.</div>
+                </div>
 
-                                <!-- Convert Menu -->
-                                <v-menu location="bottom end">
-                                    <template #activator="{ props }">
-                                        <v-icon v-bind="props" class="cursor-pointer text-secondary" size="24"
-                                            title="Convert">
-                                            mdi-compare-horizontal
-                                        </v-icon>
-                                    </template>
-                                    <v-list>
-                                        <v-list-item @click="convertItem(item, 'CONTACT')">
-                                            <v-list-item-title>Convert to Contact</v-list-item-title>
-                                        </v-list-item>
-                                        <v-list-item @click="convertItem(item, 'DEAL')">
-                                            <v-list-item-title>Convert to Deal</v-list-item-title>
-                                        </v-list-item>
-                                        <v-list-item @click="convertItem(item, 'DEAL_WON')">
-                                            <v-list-item-title>Convert to Deal Won</v-list-item-title>
-                                        </v-list-item>
-                                        <v-list-item @click="lostItem(item)">
-                                            <v-list-item-title>Lost</v-list-item-title>
-                                        </v-list-item>
-                                    </v-list>
-                                </v-menu>
-                            </div>
+                <v-row v-else dense>
+                    <v-col v-for="item in filteredItems" :key="item.id" cols="12" sm="6" md="4" lg="3">
+                        <v-card class="record-card pa-5 fill-height d-flex flex-column" elevation="0">
+                            <!-- TYPE + STATUS como header visual -->
+                            <div class="d-flex justify-space-between align-center mb-4 ga-2">
+                                <div class="d-flex align-center ga-2">
+                                    <v-chip :color="getTypeColor(item.type)"
+                                        size="small"
+                                        class="text-uppercase font-weight-bold"
+                                        variant="tonal">
+                                        {{ item.type || '—' }}
+                                    </v-chip>
 
-                            <!-- Status Chip -->
-                            <v-chip :color="getStatusColor(item)" text-color="white" class="font-weight-bold px-4 py-1"
-                                style="font-size: 1.15rem; height: auto;">
-                                {{ getStatusLabel(item) }}
-                            </v-chip>
-                        </div>
-
-
-                        <!-- Nombre y teléfono destacados -->
-                        <div class="mb-6">
-                            <div class="text-h6 font-weight-bold mb-2">
-                                {{ item.name }} {{ item.lastName }}
-                            </div>
-
-                            <div class="d-flex align-center mb-1" style="gap: 10px;">
-                                <v-icon size="22" color="primary">mdi-phone</v-icon>
-                                <span class="text-subtitle-1 font-weight-medium">{{ item.phone || '—' }}</span>
-                            </div>
-
-                            <div class="d-flex align-center" style="gap: 10px;">
-                                <v-icon size="20" color="primary">mdi-email-outline</v-icon>
-                                <span class="text-subtitle-2 font-weight-medium">{{ item.email || '—' }}</span>
-                            </div>
-                        </div>
-
-
-                        <!-- Detalles secundarios -->
-                        <div class="text-caption mb-4" style="line-height: 1.6;">
-                            <div><strong>Location:</strong> {{ item.location || '—' }}</div>
-                            <div><strong>Source:</strong> {{ item.source || '—' }}</div>
-                            <div><strong>Reminder:</strong> {{ item.reminder || '—' }}</div>
-                            <div>
-                                <strong>Assigned:</strong>
-                                <span v-if="item.assignedTo?.length">
-                                    {{ item.assignedTo[item.assignedTo.length - 1].name }}
-                                    {{ item.assignedTo[item.assignedTo.length - 1].lastName }}
-                                </span>
-                                <span v-else>—</span>
-                            </div>
-                            <div v-if="item.followUp?.length">
-                                <strong>Follow-up:</strong> {{ item.followUp.length }}
-                            </div>
-                        </div>
-
-                        <!-- Acciones -->
-                        <div class="d-flex align-center justify-end" style="gap: 10px;">
-                            <v-icon class="cursor-pointer text-primary" size="20" @click="editItem(item)" title="Edit">
-                                mdi-pencil
-                            </v-icon>
-
-                            <v-icon class="cursor-pointer text-error" size="20" @click="deleteItem(item)"
-                                title="Delete">
-                                mdi-delete
-                            </v-icon>
-
-                            <v-icon v-if="item.followUp?.length" class="cursor-pointer text-secondary" size="20"
-                                @click="openFollowUpDialog(item)" title="Follow-up">
-                                mdi-timeline-clock-outline
-                            </v-icon>
-
-                            <v-icon v-if="item.programsOffered?.length" class="cursor-pointer text-info" size="20"
-                                @click="openProgramsDialog(item.programsOffered, 'offered', item)"
-                                title="Programs Offered">
-                                mdi-eye-outline
-                            </v-icon>
-
-                            <v-icon v-if="item.programsSold?.length" class="cursor-pointer text-success" size="20"
-                                @click="openProgramsDialog(item.programsSold, 'sold', item)" title="Programs Sold">
-                                mdi-currency-usd
-                            </v-icon>
-                        </div>
-                    </v-card>
-                </v-col>
-            </v-row>
-
-
-            <!-- Follow-up Dialog -->
-            <v-dialog v-model="showFollowUpDialog" max-width="600px">
-                <v-card v-if="selectedLead">
-                    <v-card-title>
-                        Follow-up Timeline — {{ selectedLead.name }} {{ selectedLead.lastName }}
-                        <v-spacer />
-                    </v-card-title>
-                    <v-card-text>
-                        <v-timeline align="start">
-                            <v-timeline-item v-for="(follow, i) in sortedFollowUps(selectedLead.followUp)" :key="i"
-                                dot-color="primary">
-                                <div>
-                                    <strong>{{ new Date(follow.date).toLocaleDateString() }} at {{ follow.time
-                                        }}</strong><br />
-                                    <small>👤 {{ follow.employee.name }} {{ follow.employee.lastName }}</small>
+                                    <v-menu location="bottom end">
+                                        <template #activator="{ props }">
+                                            <v-btn
+                                                v-bind="props"
+                                                icon="mdi-compare-horizontal"
+                                                size="x-small"
+                                                variant="text"
+                                                title="Convert"
+                                            />
+                                        </template>
+                                        <v-list density="compact">
+                                            <v-list-item @click="convertItem(item, 'CONTACT')">
+                                                <v-list-item-title>Convert to Contact</v-list-item-title>
+                                            </v-list-item>
+                                            <v-list-item @click="convertItem(item, 'DEAL')">
+                                                <v-list-item-title>Convert to Deal</v-list-item-title>
+                                            </v-list-item>
+                                            <v-list-item @click="convertItem(item, 'DEAL_WON')">
+                                                <v-list-item-title>Convert to Deal Won</v-list-item-title>
+                                            </v-list-item>
+                                            <v-list-item @click="lostItem(item)">
+                                                <v-list-item-title>Lost</v-list-item-title>
+                                            </v-list-item>
+                                        </v-list>
+                                    </v-menu>
                                 </div>
-                            </v-timeline-item>
-                        </v-timeline>
-                    </v-card-text>
-                </v-card>
-            </v-dialog>
 
-            <!-- Programs Dialog -->
-            <v-dialog v-model="showProgramsDialog" max-width="500px">
-                <v-card>
-                    <v-card-title>
-                        {{ programDialogTitle }} — {{ currentProgramLead?.name }} {{ currentProgramLead?.lastName }}
-                        <v-spacer />
-                    </v-card-title>
-                    <v-card-text>
-                        <v-list density="compact">
-                            <v-list-item v-for="(program, index) in currentPrograms" :key="index">
-                                <v-list-item-title>{{ program.name }}</v-list-item-title>
-                                <v-list-item-subtitle>${{ program.price }}</v-list-item-subtitle>
-                            </v-list-item>
-                        </v-list>
-                        <v-divider class="my-2" />
-                        <div class="text-right font-weight-bold">
-                            Total: ${{ getProgramsTotal(currentPrograms) }}
-                        </div>
-                    </v-card-text>
-                </v-card>
-            </v-dialog>
+                                <v-chip :color="getStatusColor(item)" size="small" variant="tonal" class="font-weight-bold">
+                                    {{ getStatusLabel(item) }}
+                                </v-chip>
+                            </div>
 
-            <!-- Add/Edit Form Dialog -->
-            <v-dialog v-model="showFormDialog" max-width="900px" persistent>
-                <Form :programs="programs" :sources="sources" :locations="locations" :notSoldReasons="notSoldReasons"
-                    :itemToEdit="itemToEdit" @saved="onFormSaved" @cancel="closeFormDialog" />
-            </v-dialog>
+                            <!-- Nombre + contacto -->
+                            <div class="mb-4">
+                                <div class="text-h6 font-weight-bold text-truncate" :title="`${item.name} ${item.lastName}`">
+                                    {{ item.name }} {{ item.lastName }}
+                                </div>
+                                <div class="d-flex align-center ga-2 mt-2 text-body-2">
+                                    <v-icon size="16" color="primary">mdi-phone-outline</v-icon>
+                                    <span class="text-truncate">{{ item.phone || '—' }}</span>
+                                </div>
+                                <div class="d-flex align-center ga-2 mt-1 text-body-2 text-medium-emphasis">
+                                    <v-icon size="16">mdi-email-outline</v-icon>
+                                    <span class="text-truncate">{{ item.email || '—' }}</span>
+                                </div>
+                            </div>
+
+                            <!-- Detalles -->
+                            <div class="record-meta mb-4 flex-grow-1">
+                                <div class="record-meta-row">
+                                    <span class="record-meta-label">Location</span>
+                                    <span class="record-meta-value">{{ item.location || '—' }}</span>
+                                </div>
+                                <div class="record-meta-row">
+                                    <span class="record-meta-label">Source</span>
+                                    <span class="record-meta-value">{{ item.source || '—' }}</span>
+                                </div>
+                                <div class="record-meta-row">
+                                    <span class="record-meta-label">Reminder</span>
+                                    <span class="record-meta-value">{{ item.reminder || '—' }}</span>
+                                </div>
+                                <div class="record-meta-row">
+                                    <span class="record-meta-label">Assigned</span>
+                                    <span class="record-meta-value">
+                                        <template v-if="item.assignedTo?.length">
+                                            {{ item.assignedTo[item.assignedTo.length - 1].name }}
+                                            {{ item.assignedTo[item.assignedTo.length - 1].lastName }}
+                                        </template>
+                                        <template v-else>—</template>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <v-divider class="mb-3" />
+
+                            <!-- Acciones -->
+                            <div class="d-flex align-center justify-end ga-1">
+                                <v-tooltip text="Edit" location="top">
+                                    <template #activator="{ props }">
+                                        <v-btn v-bind="props" icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" @click="editItem(item)" />
+                                    </template>
+                                </v-tooltip>
+                                <v-tooltip text="Delete" location="top">
+                                    <template #activator="{ props }">
+                                        <v-btn v-bind="props" icon="mdi-delete-outline" size="x-small" variant="text" color="error" @click="deleteItem(item)" />
+                                    </template>
+                                </v-tooltip>
+                                <v-tooltip v-if="item.followUp?.length" text="Follow-up" location="top">
+                                    <template #activator="{ props }">
+                                        <v-btn v-bind="props" icon="mdi-timeline-clock-outline" size="x-small" variant="text" @click="openFollowUpDialog(item)" />
+                                    </template>
+                                </v-tooltip>
+                                <v-tooltip v-if="item.programsOffered?.length" text="Programs offered" location="top">
+                                    <template #activator="{ props }">
+                                        <v-btn v-bind="props" icon="mdi-eye-outline" size="x-small" variant="text" color="info" @click="openProgramsDialog(item.programsOffered, 'offered', item)" />
+                                    </template>
+                                </v-tooltip>
+                                <v-tooltip v-if="item.programsSold?.length" text="Programs sold" location="top">
+                                    <template #activator="{ props }">
+                                        <v-btn v-bind="props" icon="mdi-currency-usd" size="x-small" variant="text" color="success" @click="openProgramsDialog(item.programsSold, 'sold', item)" />
+                                    </template>
+                                </v-tooltip>
+                            </div>
+                        </v-card>
+                    </v-col>
+                </v-row>
+            </div>
+
+
         </v-card>
+
+        <!-- Follow-up Dialog -->
+        <v-dialog v-model="showFollowUpDialog" max-width="600px">
+            <v-card v-if="selectedLead" class="pa-2">
+                <v-card-title class="d-flex align-center ga-2">
+                    <v-icon color="primary">mdi-timeline-clock-outline</v-icon>
+                    <span>Follow-up Timeline</span>
+                    <v-spacer />
+                    <v-btn icon="mdi-close" variant="text" size="small" @click="showFollowUpDialog = false" />
+                </v-card-title>
+                <v-card-subtitle>{{ selectedLead.name }} {{ selectedLead.lastName }}</v-card-subtitle>
+                <v-card-text class="pt-4">
+                    <v-timeline align="start" density="comfortable" side="end">
+                        <v-timeline-item v-for="(follow, i) in sortedFollowUps(selectedLead.followUp)" :key="i"
+                            dot-color="primary" size="small">
+                            <div>
+                                <div class="text-body-2 font-weight-medium">
+                                    {{ new Date(follow.date).toLocaleDateString() }} at {{ follow.time }}
+                                </div>
+                                <div class="text-caption text-medium-emphasis">
+                                    {{ follow.employee.name }} {{ follow.employee.lastName }}
+                                </div>
+                            </div>
+                        </v-timeline-item>
+                    </v-timeline>
+                </v-card-text>
+            </v-card>
+        </v-dialog>
+
+        <!-- Programs Dialog -->
+        <v-dialog v-model="showProgramsDialog" max-width="500px">
+            <v-card class="pa-2">
+                <v-card-title class="d-flex align-center ga-2">
+                    <v-icon color="primary">mdi-school-outline</v-icon>
+                    <span>{{ programDialogTitle }}</span>
+                    <v-spacer />
+                    <v-btn icon="mdi-close" variant="text" size="small" @click="showProgramsDialog = false" />
+                </v-card-title>
+                <v-card-subtitle>{{ currentProgramLead?.name }} {{ currentProgramLead?.lastName }}</v-card-subtitle>
+                <v-card-text class="pt-2">
+                    <v-list density="compact" class="bg-transparent">
+                        <v-list-item v-for="(program, index) in currentPrograms" :key="index" class="px-0">
+                            <template #prepend>
+                                <v-icon size="18" color="primary">mdi-checkbox-marked-circle-outline</v-icon>
+                            </template>
+                            <v-list-item-title class="font-weight-medium">{{ program.name }}</v-list-item-title>
+                            <template #append>
+                                <span class="text-body-2 font-weight-bold">${{ program.price }}</span>
+                            </template>
+                        </v-list-item>
+                    </v-list>
+                    <v-divider class="my-3" />
+                    <div class="d-flex align-center justify-space-between">
+                        <span class="text-subtitle-2 text-medium-emphasis">Total</span>
+                        <span class="text-h6 font-weight-bold text-primary">
+                            ${{ getProgramsTotal(currentPrograms) }}
+                        </span>
+                    </div>
+                </v-card-text>
+            </v-card>
+        </v-dialog>
+
+        <!-- Add/Edit Form Dialog -->
+        <v-dialog v-model="showFormDialog" max-width="900px" persistent>
+            <Form :programs="programs" :sources="sources" :locations="locations" :notSoldReasons="notSoldReasons"
+                :itemToEdit="itemToEdit" @saved="onFormSaved" @cancel="closeFormDialog" />
+        </v-dialog>
     </v-container>
 </template>
 
@@ -686,5 +725,56 @@ function getTypeColor(type: any) {
 
 .gap-2 {
     gap: 8px;
+}
+
+/* Grid responsivo de filtros */
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 12px;
+}
+
+/* Cards de registros */
+.record-card {
+    border-radius: 16px !important;
+    border: 1px solid rgb(var(--v-theme-surface-variant)) !important;
+    background-color: rgb(var(--v-theme-surface)) !important;
+    transition: box-shadow 180ms ease, transform 180ms ease, border-color 180ms ease;
+}
+.record-card:hover {
+    box-shadow: var(--app-shadow-md);
+    transform: translateY(-2px);
+    border-color: rgba(var(--v-theme-primary), 0.4) !important;
+}
+
+.record-meta {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 6px;
+    font-size: 0.8rem;
+}
+.record-meta-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+.record-meta-label {
+    color: rgb(var(--v-theme-on-surface-variant));
+    font-weight: 500;
+}
+.record-meta-value {
+    font-weight: 600;
+    text-align: right;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 60%;
+}
+
+/* Tabla */
+.app-table {
+    border-radius: 0 0 12px 12px;
+    overflow: hidden;
 }
 </style>

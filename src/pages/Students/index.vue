@@ -1,45 +1,75 @@
 <template>
-    <v-container>
-        <v-card elevation="2">
-            <v-card-title class="d-flex justify-space-between align-center">
-                <span class="text-h6">Students</span>
-                <v-btn color="primary" @click="openAddDialog" size="small">
-                    Add Student
-                </v-btn>
-            </v-card-title>
+    <v-container fluid class="app-page">
+        <div class="app-page-header">
+            <div>
+                <h1 class="app-page-title">Students</h1>
+                <div class="app-page-subtitle">
+                    {{ students.length }} {{ students.length === 1 ? 'student' : 'students' }} registered
+                </div>
+            </div>
 
-            <v-data-table :headers="headers" :items="students" class="elevation-1" item-value="id"
+            <v-btn color="primary" prepend-icon="mdi-plus" @click="openAddDialog">
+                Add Student
+            </v-btn>
+        </div>
+
+        <v-card class="app-card" elevation="0">
+            <v-data-table :headers="headers" :items="students" class="app-table" item-value="id"
                 density="comfortable">
                 <template #item.fullName="{ item }">
-                    {{ item.name }} {{ item.lastName }}
+                    <div class="d-flex align-center ga-3">
+                        <v-avatar size="32" color="primary" class="text-white text-caption font-weight-bold">
+                            {{ (item.name?.[0] || '?').toUpperCase() }}
+                        </v-avatar>
+                        <span class="font-weight-medium">{{ item.name }} {{ item.lastName }}</span>
+                    </div>
                 </template>
                 <template #item.actions="{ item }">
-                    <v-icon style="cursor: pointer; margin-right: 8px;" @click="openEditDialog(item)" title="Edit">
-                        mdi-pencil
-                    </v-icon>
-                    <v-icon style="cursor: pointer;" color="red" @click="handleDelete(item.id)" title="Delete">
-                        mdi-delete
-                    </v-icon>
+                    <div class="d-flex align-center ga-1">
+                        <v-tooltip text="Edit" location="top">
+                            <template #activator="{ props }">
+                                <v-btn v-bind="props" icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" @click="openEditDialog(item)" />
+                            </template>
+                        </v-tooltip>
+                        <v-tooltip text="Delete" location="top">
+                            <template #activator="{ props }">
+                                <v-btn v-bind="props" icon="mdi-delete-outline" size="x-small" variant="text" color="error" @click="handleDelete(item.id)" />
+                            </template>
+                        </v-tooltip>
+                    </div>
+                </template>
+                <template #no-data>
+                    <div class="app-empty-state py-8">
+                        <v-icon>mdi-account-multiple-outline</v-icon>
+                        <div class="text-subtitle-2 font-weight-medium">No students yet</div>
+                        <div class="text-body-2 mt-1">Click “Add Student” to register the first one.</div>
+                    </div>
                 </template>
             </v-data-table>
         </v-card>
 
-        <v-dialog v-model="showDialog" max-width="500">
-            <v-card>
-                <v-card-title class="text-h6">
-                    {{ isEditing ? 'Edit Student' : 'New Student' }}
+        <v-dialog v-model="showDialog" max-width="520" persistent>
+            <v-card class="pa-2">
+                <v-card-title class="d-flex align-center ga-2">
+                    <v-icon color="primary">{{ isEditing ? 'mdi-pencil-outline' : 'mdi-account-plus-outline' }}</v-icon>
+                    <span>{{ isEditing ? 'Edit Student' : 'New Student' }}</span>
+                    <v-spacer />
+                    <v-btn icon="mdi-close" variant="text" size="small" @click="showDialog = false" />
                 </v-card-title>
-                <v-card-text>
-                    <v-form @submit.prevent="handleSave" ref="formRef">
-                        <v-text-field v-model="editedStudent.name" label="First Name" required />
-                        <v-text-field v-model="editedStudent.lastName" label="Last Name" required />
-                        <v-text-field v-model="editedStudent.email" label="Email" type="email" required />
-                        <v-text-field v-model="editedStudent.phone" label="Phone" required />
+                <v-card-text class="pt-4">
+                    <v-form @submit.prevent="handleSave" ref="formRef" class="d-flex flex-column ga-4">
+                        <div class="d-flex ga-3 flex-wrap flex-sm-nowrap">
+                            <v-text-field v-model="editedStudent.name" label="First Name" required class="flex-grow-1" />
+                            <v-text-field v-model="editedStudent.lastName" label="Last Name" required class="flex-grow-1" />
+                        </div>
+                        <v-text-field v-model="editedStudent.email" label="Email" type="email" required prepend-inner-icon="mdi-email-outline" />
+                        <v-text-field v-model="editedStudent.phone" label="Phone" required prepend-inner-icon="mdi-phone-outline" />
                     </v-form>
                 </v-card-text>
-                <v-card-actions class="justify-end">
-                    <v-btn text @click="showDialog = false">Cancel</v-btn>
-                    <v-btn color="primary" @click="handleSave">
+                <v-card-actions class="px-6 pb-4 ga-2">
+                    <v-spacer />
+                    <v-btn variant="text" @click="showDialog = false">Cancel</v-btn>
+                    <v-btn color="primary" variant="flat" @click="handleSave">
                         {{ isEditing ? 'Update' : 'Save' }}
                     </v-btn>
                 </v-card-actions>
@@ -62,15 +92,14 @@ watchEffect(() => {
     }
 })
 
-//const students = studentsStore.students
 const students = computed(() => studentsStore.students)
 
 const headers = [
-    { title: 'ID', key: 'id' },
+    { title: 'ID', key: 'id', width: 80 },
     { title: 'Full Name', key: 'fullName' },
     { title: 'Email', key: 'email' },
     { title: 'Phone', key: 'phone' },
-    { title: 'Actions', key: 'actions', sortable: false }
+    { title: 'Actions', key: 'actions', sortable: false, align: 'end' as const, width: 120 }
 ]
 
 const showDialog = ref(false)

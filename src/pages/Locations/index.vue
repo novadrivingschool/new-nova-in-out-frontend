@@ -1,51 +1,68 @@
 <template>
-  <v-container>
-    <v-card elevation="2">
-      <v-card-title class="d-flex justify-space-between align-center">
-        <span class="text-h6">Locations</span>
-        <v-btn color="primary" @click="openAddDialog" size="small">Add Location</v-btn>
-      </v-card-title>
+  <v-container fluid class="app-page">
+    <div class="app-page-header">
+      <div>
+        <h1 class="app-page-title">Locations</h1>
+        <div class="app-page-subtitle">
+          {{ locations.length }} {{ locations.length === 1 ? 'location' : 'locations' }} configured
+        </div>
+      </div>
 
+      <v-btn color="primary" prepend-icon="mdi-plus" @click="openAddDialog">
+        Add Location
+      </v-btn>
+    </div>
+
+    <v-card class="app-card" elevation="0">
       <v-data-table
         :headers="headers"
         :items="locations"
-        class="elevation-1"
+        class="app-table"
         item-value="id"
         density="comfortable"
       >
         <template #item.actions="{ item }">
-          <v-icon
-            class="mr-2"
-            style="cursor: pointer;"
-            @click="openEditDialog(item)"
-            title="Edit"
-          >
-            mdi-pencil
-          </v-icon>
-          <v-icon
-            color="red"
-            style="cursor: pointer;"
-            @click="handleDelete(item.id)"
-            title="Delete"
-          >
-            mdi-delete
-          </v-icon>
+          <div class="d-flex align-center ga-1">
+            <v-tooltip text="Edit" location="top">
+              <template #activator="{ props }">
+                <v-btn v-bind="props" icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" @click="openEditDialog(item)" />
+              </template>
+            </v-tooltip>
+            <v-tooltip text="Delete" location="top">
+              <template #activator="{ props }">
+                <v-btn v-bind="props" icon="mdi-delete-outline" size="x-small" variant="text" color="error" @click="handleDelete(item.id)" />
+              </template>
+            </v-tooltip>
+          </div>
+        </template>
+        <template #no-data>
+          <div class="app-empty-state py-8">
+            <v-icon>mdi-map-marker-outline</v-icon>
+            <div class="text-subtitle-2 font-weight-medium">No locations yet</div>
+            <div class="text-body-2 mt-1">Click “Add Location” to create the first one.</div>
+          </div>
         </template>
       </v-data-table>
     </v-card>
 
-    <v-dialog v-model="showDialog" max-width="500">
-      <v-card>
-        <v-card-title class="text-h6">{{ isEditMode ? 'Edit Location' : 'New Location' }}</v-card-title>
-        <v-card-text>
-          <v-form @submit.prevent="handleSave" ref="formRef">
+    <v-dialog v-model="showDialog" max-width="500" persistent>
+      <v-card class="pa-2">
+        <v-card-title class="d-flex align-center ga-2">
+          <v-icon color="primary">{{ isEditMode ? 'mdi-pencil-outline' : 'mdi-plus-circle-outline' }}</v-icon>
+          <span>{{ isEditMode ? 'Edit Location' : 'New Location' }}</span>
+          <v-spacer />
+          <v-btn icon="mdi-close" variant="text" size="small" @click="closeDialog" />
+        </v-card-title>
+        <v-card-text class="pt-4">
+          <v-form @submit.prevent="handleSave" ref="formRef" class="d-flex flex-column ga-4">
             <v-text-field v-model="editedLocation.name" label="Name" required />
             <v-text-field v-model="editedLocation.zipCode" label="Zip Code" required />
           </v-form>
         </v-card-text>
-        <v-card-actions class="justify-end">
-          <v-btn text @click="closeDialog">Cancel</v-btn>
-          <v-btn color="primary" @click="handleSave">{{ isEditMode ? 'Update' : 'Save' }}</v-btn>
+        <v-card-actions class="px-6 pb-4 ga-2">
+          <v-spacer />
+          <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
+          <v-btn color="primary" variant="flat" @click="handleSave">{{ isEditMode ? 'Update' : 'Save' }}</v-btn>
         </v-card-actions>
       </v-card>
     </v-dialog>
@@ -65,14 +82,13 @@ watchEffect(() => {
   }
 })
 
-//const locations = locationsStore.locations
 const locations = computed(() => locationsStore.locations)
 
 const headers = [
-  { title: 'ID', key: 'id' },
+  { title: 'ID', key: 'id', width: 80 },
   { title: 'Name', key: 'name' },
   { title: 'Zip Code', key: 'zipCode' },
-  { title: 'Actions', key: 'actions', sortable: false }
+  { title: 'Actions', key: 'actions', sortable: false, align: 'end' as const, width: 120 }
 ]
 
 const showDialog = ref(false)

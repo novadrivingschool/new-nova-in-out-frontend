@@ -1,57 +1,100 @@
 <template>
-    <v-container>
-        <v-card elevation="2">
-            <v-card-title class="d-flex justify-space-between align-center">
-                <span class="text-h6">Instructors</span>
-                <v-btn color="primary" @click="openDialogForNew" size="small">
-                    Add Instructor
-                </v-btn>
-            </v-card-title>
+    <v-container fluid class="app-page">
+        <div class="app-page-header">
+            <div>
+                <h1 class="app-page-title">Instructors</h1>
+                <div class="app-page-subtitle">
+                    {{ instructors.length }} {{ instructors.length === 1 ? 'instructor' : 'instructors' }} on staff
+                </div>
+            </div>
 
-            <v-data-table :headers="headers" :items="instructors" class="elevation-1" item-value="id"
+            <v-btn color="primary" prepend-icon="mdi-plus" @click="openDialogForNew">
+                Add Instructor
+            </v-btn>
+        </div>
+
+        <v-card class="app-card" elevation="0">
+            <v-data-table :headers="headers" :items="instructors" class="app-table" item-value="id"
                 density="comfortable">
                 <template #item.languages="{ item }">
-                    {{ item.languages.join(', ') }}
-                </template>
-
-                <template #item.assignedPrograms="{ item }">
-                    <span v-if="item.assignedPrograms.length === 0">None</span>
-                    <span v-else>
-                        {{item.assignedPrograms.map(p => p.name).join(', ')}}
-                    </span>
-                </template>
-
-                <template #item.actions="{ item }">
-                    <div class="d-flex align-center" style="gap: 8px;">
-                        <v-icon @click="openDialogForEdit(item)" class="cursor-pointer">
-                            mdi-pencil
-                        </v-icon>
-                        <v-icon @click="handleDelete(item.id)" class="cursor-pointer" color="red">
-                            mdi-delete
-                        </v-icon>
+                    <div class="d-flex flex-wrap ga-1">
+                        <v-chip
+                            v-for="lang in item.languages"
+                            :key="lang"
+                            size="x-small"
+                            variant="tonal"
+                            color="info"
+                        >
+                            {{ lang }}
+                        </v-chip>
                     </div>
                 </template>
 
+                <template #item.assignedPrograms="{ item }">
+                    <span v-if="item.assignedPrograms.length === 0" class="text-medium-emphasis">None</span>
+                    <div v-else class="d-flex flex-wrap ga-1">
+                        <v-chip
+                            v-for="p in item.assignedPrograms"
+                            :key="p.id"
+                            size="x-small"
+                            variant="tonal"
+                            color="primary"
+                        >
+                            {{ p.name }}
+                        </v-chip>
+                    </div>
+                </template>
+
+                <template #item.actions="{ item }">
+                    <div class="d-flex align-center ga-1">
+                        <v-tooltip text="Edit" location="top">
+                            <template #activator="{ props }">
+                                <v-btn v-bind="props" icon="mdi-pencil-outline" size="x-small" variant="text" color="primary" @click="openDialogForEdit(item)" />
+                            </template>
+                        </v-tooltip>
+                        <v-tooltip text="Delete" location="top">
+                            <template #activator="{ props }">
+                                <v-btn v-bind="props" icon="mdi-delete-outline" size="x-small" variant="text" color="error" @click="handleDelete(item.id)" />
+                            </template>
+                        </v-tooltip>
+                    </div>
+                </template>
+
+                <template #no-data>
+                    <div class="app-empty-state py-8">
+                        <v-icon>mdi-account-tie-outline</v-icon>
+                        <div class="text-subtitle-2 font-weight-medium">No instructors yet</div>
+                        <div class="text-body-2 mt-1">Click “Add Instructor” to register the first one.</div>
+                    </div>
+                </template>
             </v-data-table>
         </v-card>
 
-        <v-dialog v-model="showDialog" max-width="600">
-            <v-card>
-                <v-card-title class="text-h6">{{ isEditing ? 'Edit Instructor' : 'New Instructor' }}</v-card-title>
-                <v-card-text>
-                    <v-form @submit.prevent="handleSave" ref="formRef">
-                        <v-text-field v-model="currentInstructor.name" label="Name" required />
-                        <v-text-field v-model="currentInstructor.lastName" label="Last Name" required />
-                        <v-text-field v-model="currentInstructor.email" label="Email" required type="email" />
-                        <v-text-field v-model="currentInstructor.phone" label="Phone" required />
-                        <v-text-field v-model="currentInstructor.expertise" label="Expertise" required />
+        <v-dialog v-model="showDialog" max-width="640" persistent>
+            <v-card class="pa-2">
+                <v-card-title class="d-flex align-center ga-2">
+                    <v-icon color="primary">{{ isEditing ? 'mdi-pencil-outline' : 'mdi-account-tie' }}</v-icon>
+                    <span>{{ isEditing ? 'Edit Instructor' : 'New Instructor' }}</span>
+                    <v-spacer />
+                    <v-btn icon="mdi-close" variant="text" size="small" @click="closeDialog" />
+                </v-card-title>
+                <v-card-text class="pt-4">
+                    <v-form @submit.prevent="handleSave" ref="formRef" class="d-flex flex-column ga-4">
+                        <div class="d-flex ga-3 flex-wrap flex-sm-nowrap">
+                            <v-text-field v-model="currentInstructor.name" label="Name" required class="flex-grow-1" />
+                            <v-text-field v-model="currentInstructor.lastName" label="Last Name" required class="flex-grow-1" />
+                        </div>
+                        <v-text-field v-model="currentInstructor.email" label="Email" required type="email" prepend-inner-icon="mdi-email-outline" />
+                        <v-text-field v-model="currentInstructor.phone" label="Phone" required prepend-inner-icon="mdi-phone-outline" />
+                        <v-text-field v-model="currentInstructor.expertise" label="Expertise" required prepend-inner-icon="mdi-star-outline" />
                         <v-text-field v-model="languagesInput" label="Languages (comma separated)"
-                            placeholder="e.g. English, Spanish" />
+                            placeholder="e.g. English, Spanish" prepend-inner-icon="mdi-translate" />
                     </v-form>
                 </v-card-text>
-                <v-card-actions class="justify-end">
-                    <v-btn text @click="closeDialog">Cancel</v-btn>
-                    <v-btn color="primary" @click="handleSave">Save</v-btn>
+                <v-card-actions class="px-6 pb-4 ga-2">
+                    <v-spacer />
+                    <v-btn variant="text" @click="closeDialog">Cancel</v-btn>
+                    <v-btn color="primary" variant="flat" @click="handleSave">Save</v-btn>
                 </v-card-actions>
             </v-card>
         </v-dialog>
@@ -71,11 +114,10 @@ watchEffect(() => {
     }
 })
 
-//const instructors = instructorsStore.instructors
 const instructors = computed(() => instructorsStore.instructors)
 
 const headers = [
-    { title: 'ID', key: 'id' },
+    { title: 'ID', key: 'id', width: 80 },
     { title: 'Name', key: 'name' },
     { title: 'Last Name', key: 'lastName' },
     { title: 'Email', key: 'email' },
@@ -83,7 +125,7 @@ const headers = [
     { title: 'Expertise', key: 'expertise' },
     { title: 'Languages', key: 'languages' },
     { title: 'Assigned Programs', key: 'assignedPrograms' },
-    { title: 'Actions', key: 'actions', sortable: false },
+    { title: 'Actions', key: 'actions', sortable: false, align: 'end' as const, width: 120 },
 ]
 
 const showDialog = ref(false)

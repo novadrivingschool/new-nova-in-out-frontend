@@ -1,7 +1,18 @@
 <template>
-    <v-container class="py-8" style="max-width: 880px;">
-        <v-card elevation="2" class="pa-6 rounded-lg">
-            <v-card-title class="text-h6 font-weight-bold mb-4 text-primary">
+    <v-card class="app-card pa-2" elevation="0">
+        <v-card-title class="d-flex align-center ga-2 px-6 pt-5">
+            <v-icon color="primary">
+                {{
+                    itemToEdit
+                        ? itemToEdit.lost
+                            ? 'mdi-close-circle-outline'
+                            : itemToEdit.convertTo
+                                ? 'mdi-compare-horizontal'
+                                : 'mdi-pencil-outline'
+                        : 'mdi-plus-circle-outline'
+                }}
+            </v-icon>
+            <span class="text-h6 font-weight-bold">
                 {{
                     itemToEdit
                         ? itemToEdit.lost
@@ -11,98 +22,118 @@
                                 : 'Edit Record'
                         : 'New Record'
                 }}
-            </v-card-title>
+            </span>
+            <v-spacer />
+            <v-btn icon="mdi-close" variant="text" size="small" @click="cancelForm" />
+        </v-card-title>
+        <v-divider />
 
+        <v-card-text class="px-6 pt-5 pb-2">
             <v-form @submit.prevent="handleSave" ref="formRef" v-model="isValid">
+                <div class="form-section-label">Personal information</div>
                 <v-row dense>
                     <v-col cols="12" sm="6">
-                        <v-text-field v-model="form.name" label="First Name" required variant="underlined"
+                        <v-text-field v-model="form.name" label="First Name" required
+                            :rules="[requiredRule]" prepend-inner-icon="mdi-account-outline" />
+                    </v-col>
+                    <v-col cols="12" sm="6">
+                        <v-text-field v-model="form.lastName" label="Last Name" required
                             :rules="[requiredRule]" />
                     </v-col>
-                    <v-col cols="12" sm="6">
-                        <v-text-field v-model="form.lastName" label="Last Name" required variant="underlined"
-                            :rules="[requiredRule]" />
-                    </v-col>
+                </v-row>
 
+                <div class="form-section-label mt-4">Contact</div>
+                <v-row dense>
                     <v-col cols="12" sm="6">
-                        <v-text-field v-model="form.email" label="Email" type="email" variant="underlined"
-                            :rules="[requiredRule]" />
+                        <v-text-field v-model="form.email" label="Email" type="email"
+                            :rules="[requiredRule]" prepend-inner-icon="mdi-email-outline" />
                     </v-col>
                     <v-col cols="12" sm="6">
-                        <v-text-field v-model="form.phone" label="Phone" variant="underlined" :rules="[requiredRule]" />
+                        <v-text-field v-model="form.phone" label="Phone"
+                            :rules="[requiredRule]" prepend-inner-icon="mdi-phone-outline" />
                     </v-col>
-
                     <v-col cols="12" sm="6">
-                        <v-text-field v-model="form.phone2" label="Phone 2" variant="underlined"
-                            :rules="[requiredRule]" />
+                        <v-text-field v-model="form.phone2" label="Phone 2"
+                            :rules="[requiredRule]" prepend-inner-icon="mdi-phone-plus-outline" />
                     </v-col>
-
-                    <v-col cols="12" sm="6">
-                        <v-select v-model="form.source" :items="sources" item-title="name" item-value="name"
-                            label="Source" variant="underlined" :rules="[requiredRule]" />
-                    </v-col>
-
-                    <v-col cols="12" sm="6">
-                        <v-select v-model="form.location" :items="locations" item-title="name" item-value="name"
-                            label="Location" variant="underlined" :rules="[requiredRule]" />
-                    </v-col>
-
                     <v-col cols="12" sm="6">
                         <v-select v-model="form.language" :items="['English', 'Spanish', 'Other']" label="Language"
-                            variant="underlined" :rules="[requiredRule]" />
+                            :rules="[requiredRule]" prepend-inner-icon="mdi-translate" />
                     </v-col>
-
                     <v-col cols="12" sm="6" v-if="form.language === 'Other'">
-                        <v-text-field v-model="form.otherLanguage" label="Other Language" variant="underlined"
+                        <v-text-field v-model="form.otherLanguage" label="Other Language"
                             :rules="[requiredRule]" />
                     </v-col>
+                </v-row>
 
+                <div class="form-section-label mt-4">Origin & classification</div>
+                <v-row dense>
                     <v-col cols="12" sm="6">
-                        <v-select v-model="form.programsOffered" :items="programs" item-title="name" item-value="name"
-                            label="Programs Offered" multiple chips variant="underlined" :rules="[
-                                value =>
-                                    (value && value.length > 0) || 'At least one program is required',
-                            ]" />
+                        <v-select v-model="form.source" :items="sources" item-title="name" item-value="name"
+                            label="Source" :rules="[requiredRule]" prepend-inner-icon="mdi-source-branch" />
                     </v-col>
-
+                    <v-col cols="12" sm="6">
+                        <v-select v-model="form.location" :items="locations" item-title="name" item-value="name"
+                            label="Location" :rules="[requiredRule]" prepend-inner-icon="mdi-map-marker-outline" />
+                    </v-col>
                     <v-col cols="12" sm="6">
                         <v-select v-model="form.type" :items="['LEAD', 'CONTACT', 'DEAL']" label="Type"
-                            variant="underlined" :rules="[requiredRule]" />
+                            :rules="[requiredRule]" prepend-inner-icon="mdi-tag-outline" />
                     </v-col>
-
-                    <v-col cols="12">
-                        <v-textarea v-model="form.notes" label="Notes" rows="2" auto-grow variant="underlined"
-                            :rules="[requiredRule]" />
-                    </v-col>
-
                     <v-col cols="12" sm="6">
                         <v-menu v-model="reminderMenu" :close-on-content-click="false" transition="scale-transition"
                             offset-y max-width="290px" min-width="290px">
                             <template #activator="{ props }">
                                 <v-text-field v-model="form.reminder" label="Reminder" readonly v-bind="props"
-                                    variant="underlined" :rules="[requiredRule]" />
+                                    :rules="[requiredRule]" prepend-inner-icon="mdi-calendar-clock-outline" />
                             </template>
                             <v-date-picker :model-value="form.reminder" @update:model-value="onReminderChange"
                                 color="primary" />
                         </v-menu>
                     </v-col>
-
-                    <v-col cols="12" v-if="itemToEdit && itemToEdit.lost">
-                        <v-select v-model="form.notSoldReason" :items="notSoldReasons" item-title="name" item-value="name"
-                            label="Reason Not Sold" variant="underlined" :rules="[requiredRule]" clearable />
-                    </v-col>
-
                 </v-row>
 
-                <v-card-actions class="mt-6 justify-end">
-                    <v-btn color="primary" variant="elevated" @click="handleSave">
-                        Save
-                    </v-btn>
-                    <v-btn text @click="cancelForm">Cancel</v-btn>
-                </v-card-actions>
+                <div class="form-section-label mt-4">Programs</div>
+                <v-row dense>
+                    <v-col cols="12">
+                        <v-select v-model="form.programsOffered" :items="programs" item-title="name" item-value="name"
+                            label="Programs Offered" multiple chips closable-chips :rules="[
+                                value =>
+                                    (value && value.length > 0) || 'At least one program is required',
+                            ]" prepend-inner-icon="mdi-school-outline" />
+                    </v-col>
+                </v-row>
+
+                <div class="form-section-label mt-4">Notes</div>
+                <v-row dense>
+                    <v-col cols="12">
+                        <v-textarea v-model="form.notes" label="Notes" rows="3" auto-grow
+                            :rules="[requiredRule]" />
+                    </v-col>
+                </v-row>
+
+                <template v-if="itemToEdit && itemToEdit.lost">
+                    <div class="form-section-label mt-4">Reason</div>
+                    <v-row dense>
+                        <v-col cols="12">
+                            <v-select v-model="form.notSoldReason" :items="notSoldReasons" item-title="name" item-value="name"
+                                label="Reason Not Sold" :rules="[requiredRule]" clearable
+                                prepend-inner-icon="mdi-comment-question-outline" />
+                        </v-col>
+                    </v-row>
+                </template>
             </v-form>
-        </v-card>
-    </v-container>
+        </v-card-text>
+
+        <v-divider />
+        <v-card-actions class="px-6 py-4 ga-2">
+            <v-spacer />
+            <v-btn variant="text" @click="cancelForm">Cancel</v-btn>
+            <v-btn color="primary" variant="flat" @click="handleSave" prepend-icon="mdi-content-save-outline">
+                Save
+            </v-btn>
+        </v-card-actions>
+    </v-card>
 </template>
 
 <script setup lang="ts">
@@ -146,13 +177,11 @@ const form = ref<Partial<Lead>>({
     notSoldReason: '',
 })
 
-// Cuando cambia itemToEdit, actualizar el form
 watch(
     () => props.itemToEdit,
     (newVal) => {
         console.log('itemToEdit changed:', newVal)
         if (newVal) {
-            // Copiar valores para evitar mutaciones directas
             form.value = {
                 name: newVal.name || '',
                 lastName: newVal.lastName || '',
@@ -170,7 +199,6 @@ watch(
                 notSoldReason: newVal.notSoldReason || '',
             }
         } else {
-            // Si no hay itemToEdit (nuevo registro), resetear form
             form.value = {
                 name: '',
                 lastName: '',
@@ -202,7 +230,6 @@ const handleSave = () => {
             ...(props.itemToEdit || {}),
             ...toRaw(form.value),
         }
-        // Ensure id is a number if present, otherwise remove it
         if ('id' in savedData && typeof savedData.id !== 'number') {
             delete savedData.id
         }
@@ -240,8 +267,12 @@ const formatType = (type: any) => {
 </script>
 
 <style scoped>
-.v-card-title {
-    padding-bottom: 16px;
-    border-bottom: 1px solid #444;
+.form-section-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgb(var(--v-theme-on-surface-variant));
+    margin-bottom: 8px;
 }
 </style>

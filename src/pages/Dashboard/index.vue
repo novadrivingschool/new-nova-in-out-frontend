@@ -1,61 +1,48 @@
 <template>
-    <v-layout class="h-screen">
-      <!-- TOP NAVBAR -->
-      <v-app-bar color="primary" dark app>
-        <v-app-bar-nav-icon @click="drawerOpen = !drawerOpen" />
-        <v-toolbar-title>CRM Dashboard</v-toolbar-title>
-  
-        <v-spacer />
-  
-        <!-- LOG OUT BUTTON -->
-        <v-btn icon @click="handleLogout" title="Log out">
-          <v-icon>mdi-logout</v-icon>
-        </v-btn>
-      </v-app-bar>
-  
-      <!-- LEFT SIDEBAR -->
-      <v-navigation-drawer v-model="drawerOpen" app permanent>
-        <v-list nav dense>
-          <v-list-item
-            v-for="item in navigationItems"
-            :key="item.title"
-            :to="item.route"
-            :title="item.title"
-            :prepend-icon="item.icon"
-            link
-          />
-        </v-list>
-      </v-navigation-drawer>
-  
-      <!-- MAIN CONTENT -->
-      <v-main class="pa-6">
-        <v-container fluid>
-          <h2 class="text-h5">Welcome to your CRM dashboard</h2>
-          <p>This is your main content area.</p>
-        </v-container>
-      </v-main>
-    </v-layout>
-  </template>
-  
-  <script setup lang="ts">
-  import { ref } from 'vue'
-  import { useRouter } from 'vue-router'
-  
-  const router = useRouter()
-  const drawerOpen = ref(false)
-  
-  const navigationItems = [
-    { title: 'Leads', icon: 'mdi-account-multiple', route: '/leads' },
-    { title: 'Clients', icon: 'mdi-account-group', route: '/clients' },
-    { title: 'Payment', icon: 'mdi-account-group', route: '/payment' },
-  ]
-  
-  // Example logout handler
-  const handleLogout = () => {
-    // Clear any auth info here (e.g., localStorage, Pinia, etc.)
-    // localStorage.removeItem('token')
-  
-    router.push('/')
-  }
-  </script>
-  
+  <v-container fluid class="app-page">
+    <div class="app-page-header">
+      <div>
+        <h1 class="app-page-title">Welcome to your dashboard</h1>
+        <div class="app-page-subtitle">Here is a quick overview of your CRM</div>
+      </div>
+    </div>
+
+    <v-row class="ma-0" dense>
+      <v-col v-for="card in metricCards" :key="card.title" cols="12" sm="6" md="3">
+        <v-card class="app-card pa-5 fill-height" elevation="0">
+          <div class="d-flex align-center justify-space-between mb-3">
+            <span class="text-caption text-medium-emphasis font-weight-bold text-uppercase" style="letter-spacing: 0.06em;">
+              {{ card.title }}
+            </span>
+            <div
+              class="d-flex align-center justify-center"
+              :style="`background: rgba(var(--v-theme-${card.color}), 0.12); width: 40px; height: 40px; border-radius: 12px;`"
+            >
+              <v-icon :color="card.color" size="20">{{ card.icon }}</v-icon>
+            </div>
+          </div>
+          <div class="text-h4 font-weight-bold">{{ card.value }}</div>
+          <div class="text-caption text-medium-emphasis mt-1">{{ card.hint }}</div>
+        </v-card>
+      </v-col>
+    </v-row>
+
+    <v-card class="app-card mt-6 pa-6" elevation="0">
+      <div class="text-subtitle-1 font-weight-bold mb-2">Get started</div>
+      <p class="text-body-2 text-medium-emphasis ma-0">
+        Use the sidebar to navigate through Leads, Contacts, Deals, Calendar and more.
+      </p>
+    </v-card>
+  </v-container>
+</template>
+
+<script setup lang="ts">
+import { ref } from 'vue'
+
+const metricCards = ref([
+  { title: 'Leads', value: '—', hint: 'Total registered', icon: 'mdi-account-multiple', color: 'primary' },
+  { title: 'Contacts', value: '—', hint: 'Active contacts', icon: 'mdi-account-box-outline', color: 'info' },
+  { title: 'Deals', value: '—', hint: 'In pipeline', icon: 'mdi-handshake-outline', color: 'success' },
+  { title: 'Today', value: '—', hint: 'Scheduled events', icon: 'mdi-calendar-today', color: 'warning' },
+])
+</script>

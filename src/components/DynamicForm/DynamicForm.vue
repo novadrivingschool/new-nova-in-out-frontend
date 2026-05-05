@@ -1,14 +1,17 @@
 <template>
     <v-form ref="formRef" v-model="isValid">
-        <v-container fluid>
-            <v-row>
+        <v-card class="app-card pa-5 pa-sm-6" elevation="0">
+            <v-row dense>
                 <template v-for="(f, i) in schema.fields" :key="f.id || i">
                     <v-col :cols="f.cols || 12">
                         <!-- radio -->
                         <template v-if="f.type === 'radio'">
-                            <div class="text-subtitle-2 mb-1">{{ f.label }}</div>
-                            <v-radio-group v-model="formData[f.key]" :rules="rules(f)">
-                                <v-radio v-for="opt in (f.options || [])" :key="opt" :label="opt" :value="opt" />
+                            <div class="text-subtitle-2 font-weight-medium mb-1">
+                                {{ f.label }}
+                                <span v-if="f.required" class="text-error">*</span>
+                            </div>
+                            <v-radio-group v-model="formData[f.key]" :rules="rules(f)" inline density="comfortable">
+                                <v-radio v-for="opt in (f.options || [])" :key="opt" :label="opt" :value="opt" color="primary" />
                             </v-radio-group>
                         </template>
 
@@ -18,14 +21,14 @@
                                 <template #activator="{ props }">
                                     <v-text-field v-bind="props" :label="f.label" :model-value="formData[f.key]"
                                         :rules="rules(f)" readonly clearable @click:clear="formData[f.key] = null"
-                                        append-inner-icon="mdi-calendar" />
+                                        prepend-inner-icon="mdi-calendar-outline" />
                                 </template>
-                                <v-card>
+                                <v-card class="pa-2">
                                     <v-date-picker v-model="dateBuffer[f.key]" />
                                     <v-card-actions>
                                         <v-spacer />
                                         <v-btn variant="text" @click="menus[f.key] = false">Cancelar</v-btn>
-                                        <v-btn variant="tonal" color="primary" @click="applyDate(f.key)">OK</v-btn>
+                                        <v-btn variant="flat" color="primary" @click="applyDate(f.key)">OK</v-btn>
                                     </v-card-actions>
                                 </v-card>
                             </v-menu>
@@ -40,18 +43,18 @@
                 </template>
             </v-row>
 
-            <v-row>
-                <v-col cols="12" class="d-flex">
-                    <v-spacer />
-                    <v-btn :loading="submitting" color="primary" @click="onSubmit">
-                        {{ schema.submit?.btnText || 'Enviar' }}
-                    </v-btn>
-                </v-col>
-            </v-row>
+            <v-divider class="my-5" />
 
-            <v-alert v-if="okMsg" type="success" variant="tonal" class="mt-4">{{ okMsg }}</v-alert>
-            <v-alert v-if="errMsg" type="error" variant="tonal" class="mt-4">{{ errMsg }}</v-alert>
-        </v-container>
+            <div class="d-flex justify-end">
+                <v-btn :loading="submitting" color="primary" variant="flat" size="large"
+                    prepend-icon="mdi-send-outline" @click="onSubmit">
+                    {{ schema.submit?.btnText || 'Enviar' }}
+                </v-btn>
+            </div>
+
+            <v-alert v-if="okMsg" type="success" variant="tonal" class="mt-4" rounded="lg">{{ okMsg }}</v-alert>
+            <v-alert v-if="errMsg" type="error" variant="tonal" class="mt-4" rounded="lg">{{ errMsg }}</v-alert>
+        </v-card>
     </v-form>
 </template>
 

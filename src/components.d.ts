@@ -8,7 +8,10 @@ export {}
 /* prettier-ignore */
 declare module 'vue' {
   export interface GlobalComponents {
+    ActivityLoader: typeof import('./components/common/ActivityLoader.vue')['default']
+    AdminDashboardFilter: typeof import('./components/AdminDashboard/AdminDashboardFilter.vue')['default']
     AppBar: typeof import('./components/AppBar/AppBar.vue')['default']
+    AttendanceTable: typeof import('./components/AdminDashboard/AttendanceTable.vue')['default']
     Calendar: typeof import('./components/Calendar/Calendar.vue')['default']
     DynamicForm: typeof import('./components/DynamicForm/DynamicForm.vue')['default']
     Form: typeof import('./components/Form/Form.vue')['default']
@@ -20,5 +23,6 @@ declare module 'vue' {
     RouterView: typeof import('vue-router')['RouterView']
     ScheduleCalendar: typeof import('./components/Schedule/ScheduleCalendar.vue')['default']
     SharedTable: typeof import('./components/TableRecords/SharedTable.vue')['default']
+    TotalHoursDashboard: typeof import('./components/AdminDashboard/TotalHoursDashboard.vue')['default']
   }
 }

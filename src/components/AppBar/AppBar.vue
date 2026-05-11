@@ -1,12 +1,6 @@
 <template>
   <!-- TOP NAVBAR -->
-  <v-app-bar
-    app
-    flat
-    color="surface"
-    height="64"
-    class="app-appbar"
-  >
+  <v-app-bar app flat color="surface" height="64" class="app-appbar">
     <v-app-bar-nav-icon
       v-if="smAndDown"
       class="ms-1"
@@ -18,10 +12,13 @@
         <v-icon size="22" color="primary">mdi-car-cog</v-icon>
       </div>
       <div class="d-none d-sm-block">
-        <div class="text-subtitle-1 font-weight-bold" style="line-height: 1.1;">
+        <div class="text-subtitle-1 font-weight-bold" style="line-height: 1.1">
           NOVA <span class="text-primary">IO</span>
         </div>
-        <div class="text-caption text-medium-emphasis" style="letter-spacing: 0.04em;">
+        <div
+          class="text-caption text-medium-emphasis"
+          style="letter-spacing: 0.04em"
+        >
           CRM Dashboard
         </div>
       </div>
@@ -41,7 +38,7 @@
           @click="isDarkTheme = !isDarkTheme"
         >
           <v-icon>{{
-            isDarkTheme ? 'mdi-weather-night' : 'mdi-white-balance-sunny'
+            isDarkTheme ? "mdi-weather-night" : "mdi-white-balance-sunny"
           }}</v-icon>
         </v-btn>
       </template>
@@ -96,10 +93,14 @@
       <div class="app-drawer-footer">
         <v-divider class="mb-3" />
         <div class="d-flex align-center ga-3 px-2 pb-2">
-          <v-avatar size="36" color="primary" class="text-white font-weight-bold">
+          <v-avatar
+            size="36"
+            color="primary"
+            class="text-white font-weight-bold"
+          >
             {{ userInitial }}
           </v-avatar>
-          <div class="flex-grow-1" style="min-width: 0;">
+          <div class="flex-grow-1" style="min-width: 0">
             <div class="text-body-2 font-weight-medium text-truncate">
               {{ userLabel }}
             </div>
@@ -158,14 +159,14 @@ const isDarkTheme = computed({
 // Datos de usuario para el footer del drawer
 const userLabel = computed(() => {
   const u: any = (auth as any).user || {};
-  return u.name || u.fullName || u.email || 'User';
+  return u.name || u.fullName || u.email || "User";
 });
 const userEmail = computed(() => {
   const u: any = (auth as any).user || {};
-  return u.email || '';
+  return u.email || "";
 });
 const userInitial = computed(() => {
-  const label = userLabel.value || 'U';
+  const label = userLabel.value || "U";
   return label.charAt(0).toUpperCase();
 });
 
@@ -246,7 +247,16 @@ const calendar = [
 const socket = [
   { title: "Hand Shake", icon: "mdi-handshake-outline", route: "/test" },
   { title: "Screenshots", icon: "mdi-camera", route: "/screenshots" },
-  { title: "Live Staff Activity", icon: "mdi-broadcast", route: "/live-staff-activity" },
+  {
+    title: "Live Staff Activity",
+    icon: "mdi-broadcast",
+    route: "/live-staff-activity",
+  },
+  {
+    title: "Dashboards",
+    icon: "mdi-view-grid",
+    route: "/admin-dashboard",
+  },
 ];
 
 const handleLogout = async () => {

@@ -24,7 +24,6 @@
         </template>
         <v-date-picker
           v-model="rawStartDate"
-          color="primary"
           @update:model-value="startMenu = false"
         ></v-date-picker>
       </v-menu>
@@ -45,7 +44,6 @@
         </template>
         <v-date-picker
           v-model="rawEndDate"
-          color="primary"
           @update:model-value="endMenu = false"
         ></v-date-picker>
       </v-menu>
@@ -89,9 +87,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
-import type { ApexOptions } from "apexcharts";
 import apexchart from "vue3-apexcharts"; // Alias necesario para el template
-import NovaInOutServices from "@/services/NovaInOutServices";
 import { useAttendanceChart } from "@/composables/useAttendanceChart";
 import { useDisplay } from "vuetify/lib/composables/display.mjs";
 

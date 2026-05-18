@@ -2,6 +2,10 @@
   <v-container fluid>
     <v-card variant="outlined" class="rounded-lg">
       <v-data-table :headers="headers" :items="items" :loading="loading" hover>
+        <template v-slot:item.fullName="{ item }">
+          {{ item.fullName ? item.fullName : "Unknown User" }}
+        </template>
+
         <template v-slot:item.type_of_clock="{ item }">
           <v-chip
             size="small"
@@ -23,6 +27,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue";
 import { getTodayString } from "@/utils/getTodayString";
+import { useAuth } from "@/stores/auth/useAuth";
 
 // 1. Definimos la "forma" de tu objeto de asistencia
 interface AttendanceLog {
@@ -30,7 +35,7 @@ interface AttendanceLog {
   type_of_clock: string;
   clock_time: string;
   clock_date?: string; // El ? significa que es opcional
-  employee_name?: string;
+  fullName?: string;
 }
 
 const props = defineProps<{
@@ -43,7 +48,8 @@ const items = ref<AttendanceLog[]>([]);
 const loading = ref(false);
 
 const headers = [
-  { title: "Employee #", key: "employee_number", align: "start" as const },
+  { title: "Name", key: "fullName", align: "start" as const },
+  { title: "Employee #", key: "employee_number" },
   { title: "Status", key: "type_of_clock" },
   { title: "Time", key: "clock_time" },
 ];
@@ -53,6 +59,7 @@ const loadData = async () => {
   try {
     const today = getTodayString();
     // Ahora TS sabe que lo que llega aquí es un AttendanceLog[]
+
     items.value = await props.fetchFn(today);
   } catch (error) {
     console.error("Error loading table data", error);
@@ -62,4 +69,8 @@ const loadData = async () => {
 };
 
 onMounted(loadData);
+
+defineExpose({
+  loadData,
+});
 </script>

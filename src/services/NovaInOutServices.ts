@@ -2,6 +2,7 @@
 
 import axios from "axios";
 import { useAuth } from "@/stores/auth/useAuth";
+import { http } from "@/lib/http";
 
 // ✅ Las constantes se leen aquí — Vite las inyecta en build time,
 //    no dependen de Pinia ni del ciclo de vida de Vue.
@@ -205,7 +206,7 @@ const NovaInOutServices = {
       `Fetching total hours summary un range ${startDate} - ${endDate}`,
     );
     try {
-      const response = await axios.get(
+      const response = await http.get(
         `${API_NOVA_IN_OUT_URL}/nova-in-out/total-hours`,
         {
           params: { startDate, endDate },
@@ -225,7 +226,7 @@ const NovaInOutServices = {
 
   async getClockedInNow(date: string) {
     try {
-      const response = await axios.get(
+      const response = await http.get(
         `${API_NOVA_IN_OUT_URL}/nova-in-out/clocked-in-now`,
         {
           params: { date },
@@ -243,9 +244,29 @@ const NovaInOutServices = {
     }
   },
 
+  async getNotClockedInNow(date: string) {
+    try {
+      const response = await http.get(
+        `${API_NOVA_IN_OUT_URL}/nova-in-out/not-clocked-in-now`,
+        {
+          params: { date },
+        },
+      );
+      console.log(`✅ [getnotClockedInNow] Data received: ${response.data}`);
+      console.log(response.data);
+      return response.data;
+    } catch (error) {
+      console.error(
+        `❌ [getClockedInNow] Error getting data for ${date}`,
+        error,
+      );
+      throw new Error("Error fetching clocked in now data");
+    }
+  },
+
   async getClockedInToday(date: string) {
     try {
-      const response = await axios.get(
+      const response = await http.get(
         `${API_NOVA_IN_OUT_URL}/nova-in-out/clocked-in-today`,
         {
           params: { date },
@@ -259,6 +280,23 @@ const NovaInOutServices = {
         `❌ [getClockedInNow] Error getting data for ${date}`,
         error,
       );
+      throw new Error("Error fetching clocked in now data");
+    }
+  },
+
+  async getSummary(date: string) {
+    try {
+      const response = await http.get(
+        `${API_NOVA_IN_OUT_URL}/nova-in-out/summary`,
+        {
+          params: { date },
+        },
+      );
+      console.log(`✅ [getSummary] Data received: ${response.data}`);
+      console.log(response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`❌ [getClockedInNow] Error getting data`, error);
       throw new Error("Error fetching clocked in now data");
     }
   },

@@ -257,6 +257,11 @@ const socket = [
     icon: "mdi-view-grid",
     route: "/admin-dashboard",
   },
+  {
+    title: "Users",
+    icon: "mdi-account",
+    route: "/users",
+  },
 ];
 
 const handleLogout = async () => {

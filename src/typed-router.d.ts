@@ -48,6 +48,10 @@ declare module 'vue-router/auto-routes' {
     '/Student-Calendar/': RouteRecordInfo<'/Student-Calendar/', '/Student-Calendar', Record<never, never>, Record<never, never>>,
     '/Students/': RouteRecordInfo<'/Students/', '/Students', Record<never, never>, Record<never, never>>,
     '/Test/': RouteRecordInfo<'/Test/', '/Test', Record<never, never>, Record<never, never>>,
+    '/users': RouteRecordInfo<'/users', '/users', Record<never, never>, Record<never, never>>,
+    '/users/': RouteRecordInfo<'/users/', '/users', Record<never, never>, Record<never, never>>,
+    '/users/[id]': RouteRecordInfo<'/users/[id]', '/users/:id', { id: ParamValue<true> }, { id: ParamValue<false> }>,
+    '/users/add': RouteRecordInfo<'/users/add', '/users/add', Record<never, never>, Record<never, never>>,
     '/Virtual-Office/': RouteRecordInfo<'/Virtual-Office/', '/Virtual-Office', Record<never, never>, Record<never, never>>,
   }
 }

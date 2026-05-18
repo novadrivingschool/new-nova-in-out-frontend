@@ -11,7 +11,10 @@ declare module 'vue' {
     ActivityLoader: typeof import('./components/common/ActivityLoader.vue')['default']
     AdminDashboardFilter: typeof import('./components/AdminDashboard/AdminDashboardFilter.vue')['default']
     AppBar: typeof import('./components/AppBar/AppBar.vue')['default']
+    AppSnackbar: typeof import('./components/common/AppSnackbar.vue')['default']
     AttendanceTable: typeof import('./components/AdminDashboard/AttendanceTable.vue')['default']
+    BaseDialog: typeof import('./components/common/BaseDialog.vue')['default']
+    BaseTable: typeof import('./components/common/BaseTable.vue')['default']
     Calendar: typeof import('./components/Calendar/Calendar.vue')['default']
     DynamicForm: typeof import('./components/DynamicForm/DynamicForm.vue')['default']
     Form: typeof import('./components/Form/Form.vue')['default']
@@ -24,5 +27,6 @@ declare module 'vue' {
     ScheduleCalendar: typeof import('./components/Schedule/ScheduleCalendar.vue')['default']
     SharedTable: typeof import('./components/TableRecords/SharedTable.vue')['default']
     TotalHoursDashboard: typeof import('./components/AdminDashboard/TotalHoursDashboard.vue')['default']
+    UserInformation: typeof import('./components/Users/UserInformation.vue')['default']
   }
 }

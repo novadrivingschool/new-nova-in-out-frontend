@@ -1,150 +1,174 @@
-import { ref, computed, type Ref } from "vue";
-import { useTheme } from "vuetify";
-import NovaInOutServices from "@/services/NovaInOutServices";
-import type { ApexOptions } from "apexcharts";
+/**
+ * src/composables/useAttendanceChart.ts
+ *
+ * Serie y configuración del gráfico de horas trabajadas.
+ *
+ * Los colores se leen del tema activo de Vuetify en lugar de estar escritos a
+ * mano: la versión anterior fijaba `#00BFA5` y grises concretos, de modo que el
+ * gráfico ignoraba el modo oscuro y no coincidía con el resto de la interfaz.
+ */
+import { computed, ref, type Ref } from 'vue'
+import { useTheme } from 'vuetify'
+import NovaInOutServices from '@/services/NovaInOutServices'
+import type { ApexOptions } from 'apexcharts'
+
+interface TotalHoursEntry {
+  date: string
+  totalHours: number
+}
 
 interface UseAttendanceChartReturn {
-  loading: Ref<boolean>;
-  chartOptions: Ref<ApexOptions>;
-  chartSeries: Ref<any[]>;
-  fetchChartData: (startDate?: string, endDate?: string) => Promise<void>;
+  loading: Ref<boolean>
+  error: Ref<string | null>
+  isEmpty: Ref<boolean>
+  chartOptions: Ref<ApexOptions>
+  chartSeries: Ref<Array<{ name: string; data: number[] }>>
+  fetchChartData: (startDate?: string, endDate?: string) => Promise<void>
 }
 
 export function useAttendanceChart(): UseAttendanceChartReturn {
-  const theme = useTheme();
-  const loading = ref(false);
+  const theme = useTheme()
 
-  // --- ESTADO DE DATOS (REFS) ---
-  // Guardamos los datos crudos aquí para que el computed los use
-  const categories = ref<string[]>([]);
-  const maxY = ref(10);
-  const chartSeries = ref([{ name: "Total Hours", data: [] as number[] }]);
+  const loading = ref(false)
+  const error = ref<string | null>(null)
+  const categories = ref<string[]>([])
+  const maxY = ref(10)
+  const chartSeries = ref([{ name: 'Total Hours', data: [] as number[] }])
 
-  // Helper para detectar el modo oscuro
-  const isDark = computed(() => theme.global.name.value === "dark");
+  const isDark = computed(() => theme.global.name.value === 'dark')
 
-  // --- CONFIGURACIÓN DINÁMICA (COMPUTED) ---
+  /** Colores del tema activo, en hexadecimal, que es lo que espera ApexCharts. */
+  const palette = computed(() => {
+    const colors = theme.current.value.colors
+    return {
+      primary: colors.primary,
+      surface: colors.surface,
+      onSurface: colors['on-surface'],
+      onSurfaceVariant: colors['on-surface-variant'],
+      border: String(theme.current.value.variables['border-color']),
+    }
+  })
+
+  const isEmpty = computed(
+    () => !loading.value && chartSeries.value[0].data.length === 0,
+  )
+
   const chartOptions = computed<ApexOptions>(() => {
-    // Definimos colores basados en el tema
-    const textColor = isDark.value ? "#eceff1" : "#455a64";
-    const gridColor = isDark.value ? "rgba(255, 255, 255, 0.1)" : "#e0e0e0";
-    const subTextColor = isDark.value
-      ? "rgba(255, 255, 255, 0.5)"
-      : "rgba(0, 0, 0, 0.4)";
+    const { primary, onSurface, onSurfaceVariant, border, surface } =
+      palette.value
 
     return {
-      // theme: {
-      //   mode: isDark.value ? "dark" : "light",
-      // },
       chart: {
-        type: "line",
+        type: 'line',
         toolbar: { show: false },
         zoom: { enabled: false },
-        // Ajusta automáticamente el fondo de menús internos de Apex
-        theme: isDark.value ? "dark" : "light",
-        fontFamily: "Inter, Roboto, sans-serif",
+        background: 'transparent',
+        fontFamily: 'Inter, Roboto, sans-serif',
+        animations: { enabled: true, speed: 400 },
       },
-      colors: ["#00BFA5"], // Tu color principal
-      stroke: {
-        curve: "straight",
-        width: 3,
-      },
+      theme: { mode: isDark.value ? 'dark' : 'light' },
+      colors: [primary],
+      stroke: { curve: 'straight', width: 3 },
       markers: {
-        size: 5,
-        colors: ["#00BFA5"],
-        strokeColors: isDark.value ? "#1e1e1e" : "#fff",
+        size: 4,
+        colors: [primary],
+        strokeColors: surface,
         strokeWidth: 2,
-        hover: { size: 7 },
+        hover: { size: 6 },
       },
       grid: {
         show: true,
-        borderColor: gridColor,
+        borderColor: border,
         xaxis: { lines: { show: false } },
         yaxis: { lines: { show: true } },
+        padding: { left: 8, right: 8 },
       },
       xaxis: {
-        categories: categories.value, // <--- Lee de la ref
-        labels: {
-          style: { colors: subTextColor, fontSize: "11px" },
-        },
+        categories: categories.value,
+        labels: { style: { colors: onSurfaceVariant, fontSize: '11px' } },
         title: {
-          text: "Day of Month",
-          style: {
-            color: textColor,
-            fontSize: "12px",
-            fontWeight: 600,
-          },
+          text: 'Day of month',
+          style: { color: onSurface, fontSize: '12px', fontWeight: 600 },
         },
         axisBorder: { show: false },
         axisTicks: { show: false },
-        tickPlacement: "on",
+        tickPlacement: 'on',
       },
       yaxis: {
         min: 0,
-        max: maxY.value, // <--- Lee de la ref
+        max: maxY.value,
         tickAmount: 4,
         labels: {
-          style: { colors: subTextColor, fontSize: "11px" },
-          formatter: (val) => val.toFixed(2),
+          style: { colors: onSurfaceVariant, fontSize: '11px' },
+          formatter: (value: number) => value.toFixed(1),
         },
         title: {
-          text: "Hours Worked",
-          style: {
-            color: textColor,
-            fontSize: "12px",
-            fontWeight: 600,
-          },
+          text: 'Hours worked',
+          style: { color: onSurface, fontSize: '12px', fontWeight: 600 },
         },
       },
       tooltip: {
-        theme: isDark.value ? "dark" : "light",
+        theme: isDark.value ? 'dark' : 'light',
         shared: true,
         intersect: false,
-        y: {
-          formatter: (val: number) => `${val.toFixed(2)} hrs`,
-        },
+        y: { formatter: (value: number) => `${value.toFixed(2)} hrs` },
       },
-    };
-  });
-
-  // --- LÓGICA DE CARGA ---
-  const fetchChartData = async (startDate?: string, endDate?: string) => {
-    loading.value = true;
-
-    let start = startDate;
-    let end = endDate;
-
-    if (!start || !end) {
-      const today = new Date();
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(today.getDate() - 30);
-
-      end = today.toISOString().split("T")[0];
-      start = thirtyDaysAgo.toISOString().split("T")[0];
+      // ApexCharts no es responsive por sí solo con títulos de eje largos
+      responsive: [
+        {
+          breakpoint: 600,
+          options: {
+            xaxis: { title: { text: undefined } },
+            yaxis: { title: { text: undefined }, tickAmount: 3 },
+            markers: { size: 0 },
+          },
+        },
+      ],
     }
+  })
+
+  /** Rango por defecto: los últimos 30 días. */
+  function defaultRange(): { start: string; end: string } {
+    const today = new Date()
+    const past = new Date()
+    past.setDate(today.getDate() - 30)
+    const format = (date: Date) => date.toISOString().split('T')[0]
+    return { start: format(past), end: format(today) }
+  }
+
+  async function fetchChartData(
+    startDate?: string,
+    endDate?: string,
+  ): Promise<void> {
+    loading.value = true
+    error.value = null
+
+    const fallback = defaultRange()
+    const start = startDate || fallback.start
+    const end = endDate || fallback.end
 
     try {
-      const result = await NovaInOutServices.getTotalHours(start, end);
+      const result: TotalHoursEntry[] = await NovaInOutServices.getTotalHours(
+        start,
+        end,
+      )
 
-      // Mapeamos los datos
-      const daysLabels = result.map((item: any) => item.date.split("-")[2]);
-      const hoursValues = result.map((item: any) => item.totalHours);
+      const entries = Array.isArray(result) ? result : []
+      const hours = entries.map((entry) => Number(entry.totalHours) || 0)
 
-      // ACTUALIZAMOS LAS REFS (Esto hace que el computed se recalcule solo)
-      categories.value = daysLabels;
-      maxY.value = Math.ceil(Math.max(...hoursValues, 10) * 1.1);
-      chartSeries.value = [{ name: "Total Hours", data: hoursValues }];
+      categories.value = entries.map((entry) => entry.date.split('-')[2])
+      // `Math.max` sobre un array vacío devuelve -Infinity: el 10 lo evita.
+      maxY.value = Math.ceil(Math.max(...hours, 10) * 1.1)
+      chartSeries.value = [{ name: 'Total Hours', data: hours }]
     } catch (err) {
-      console.error("Error fetching chart data:", err);
+      console.error('Error fetching chart data:', err)
+      error.value = 'Could not load the hours chart.'
+      categories.value = []
+      chartSeries.value = [{ name: 'Total Hours', data: [] }]
     } finally {
-      loading.value = false;
+      loading.value = false
     }
-  };
+  }
 
-  return {
-    loading,
-    chartOptions,
-    chartSeries,
-    fetchChartData,
-  };
+  return { loading, error, isEmpty, chartOptions, chartSeries, fetchChartData }
 }

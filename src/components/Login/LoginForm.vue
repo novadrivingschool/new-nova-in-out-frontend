@@ -1,561 +1,298 @@
-<!-- src/components/Login/LoginForm.vue -->
+<!--
+  src/components/Login/LoginForm.vue
+
+  Acceso. Misma estructura y técnica que go-nova/src/views/auth/LoginView.vue
+  (referencia directa pedida): `v-theme-provider` en vez de un hack con
+  v-sheet, retícula + viñeta en un componente de fondo aparte, tarjeta de
+  cristal con filete claro de contorno y campos oscuros "solo-filled". La
+  diferencia es la marca: el wordmark separa "N"/"O" (blanco, `on-surface`)
+  de la "I" (`login-navy` en plugins/vuetify.ts, calibrado por contraste
+  WCAG — ver el comentario junto a su definición) en vez del azul vibrante de
+  `primary` que usa el resto de la app. Es deliberado, no un descuido:
+  `primary` es el acento de marca para navegación y acciones en toda la
+  interfaz, mientras que el login pidió expresamente un tono más serio y no
+  lo comparte. La card en sí sigue en `surface`, igual que el resto de la
+  app — se probaron dos variantes de un fondo de card propio (gris
+  intermedio, luego azul sólido) y ninguna mejoró sobre esto; el contraste
+  real lo da el acento sobre la card oscura, no el color de la card. El login
+  sigue siempre en oscuro, sin selector de tema, sea cual sea el ajuste del
+  resto de la app.
+
+  Sin `v-main` propio: App.vue ya envuelve cada `<router-view>` en su propio
+  `v-main`, así que anidar otro aquí duplicaría el layout de Vuetify. El
+  `v-theme-provider` con `with-background` es directamente la raíz visual y
+  simplemente llena ese `v-main` (`height: 100%`).
+-->
 <template>
-    <div class="login-root">
+  <v-theme-provider theme="dark" with-background class="login-root">
+    <LoginBackdrop />
 
-        <!-- ═══════════════════ PANEL IZQUIERDO (branding) ═══════════════════ -->
-        <div class="login-hero d-none d-md-flex">
-            <!-- Patrón de fondo sutil -->
-            <div class="hero-grid" aria-hidden="true" />
+    <div class="login-center">
+      <div class="login-stack">
+        <v-card class="login-card" elevation="0">
+          <p class="login-card__wordmark">
+            N<span class="login-card__wordmark-accent">I</span>O
+          </p>
 
-            <!-- Círculos decorativos -->
-            <div class="hero-circle hero-circle--lg" aria-hidden="true" />
-            <div class="hero-circle hero-circle--sm" aria-hidden="true" />
+          <v-card-text class="pa-0">
+            <h1 class="login-card__title">Good to see you</h1>
 
-            <div class="hero-content">
-                <!-- Logo + nombre -->
-                <div class="hero-brand">
-                    <div class="hero-logo-wrap">
-                        <img :src="logoUrl" alt="Nova IO" class="hero-logo-img" />
-                    </div>
-                    <div class="hero-brand-text">
-                        <span class="hero-brand-name">Nova In Out</span>
-                        <span class="hero-brand-sub">Nova Driving School</span>
-                    </div>
-                </div>
+            <p
+              v-if="auth.error"
+              class="login-card__error mt-5"
+              role="alert"
+              aria-live="assertive"
+            >
+              {{ auth.error }}
+            </p>
 
-                <!-- Pitch principal -->
-                <div class="hero-pitch">
-                    <h1 class="hero-headline">
-                        Track time.<br />
-                        Stay productive.
-                    </h1>
-                    <p class="hero-subline">
-                        Clock in, monitor activity and manage your team — all in one place.
-                    </p>
-                </div>
+            <v-form class="login-form mt-5" @submit.prevent="handleLogin">
+              <v-text-field
+                v-model="employeeNumber"
+                name="employeeNumber"
+                type="text"
+                label="Employee number"
+                placeholder="NIOJD483920"
+                variant="solo-filled"
+                flat
+                autocomplete="username"
+                autocapitalize="characters"
+                autocorrect="off"
+                spellcheck="false"
+                prepend-inner-icon="mdi-account-outline"
+                class="login-field login-field--mono mb-3"
+                :disabled="auth.loading"
+                :error="hasError"
+                @keyup.enter="handleLogin"
+              />
 
-                <!-- Feature chips -->
-                <div class="hero-chips">
-                    <span class="hero-chip">
-                        <span class="hero-chip-dot" />
-                        Activity tracking
-                    </span>
-                    <span class="hero-chip">
-                        <span class="hero-chip-dot" />
-                        Screenshot capture
-                    </span>
-                    <span class="hero-chip">
-                        <span class="hero-chip-dot" />
-                        Real-time reporting
-                    </span>
-                </div>
+              <v-text-field
+                v-model="password"
+                name="password"
+                :type="showPassword ? 'text' : 'password'"
+                label="Password"
+                placeholder="••••••••"
+                variant="solo-filled"
+                flat
+                autocomplete="current-password"
+                prepend-inner-icon="mdi-lock-outline"
+                :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
+                class="login-field"
+                :disabled="auth.loading"
+                :error="hasError"
+                @click:append-inner="showPassword = !showPassword"
+                @keyup.enter="handleLogin"
+              />
 
-                <!-- Footer del panel -->
-                <p class="hero-footer">© {{ new Date().getFullYear() }} Nova Driving School</p>
-            </div>
-        </div>
-
-        <!-- ═══════════════════ PANEL DERECHO (formulario) ═══════════════════ -->
-        <div class="login-form-panel">
-
-            <!-- Mobile: logo compacto -->
-            <div class="mobile-brand d-flex d-md-none">
-                <img :src="logoUrl" alt="Nova IO" class="mobile-logo" />
-                <span class="mobile-brand-name">Nova In Out</span>
-            </div>
-
-            <div class="login-card">
-
-                <!-- Encabezado -->
-                <div class="card-header">
-                    <div class="card-icon-wrap">
-                        <v-icon color="primary" size="26">mdi-account-clock-outline</v-icon>
-                    </div>
-                    <h2 class="card-title">Welcome back</h2>
-                    <p class="card-subtitle">Sign in to continue to your dashboard.</p>
-                </div>
-
-                <!-- Formulario -->
-                <v-form class="card-form" @submit.prevent="handleLogin">
-
-                    <div class="field-group">
-                        <label class="field-label">Email address</label>
-                        <v-text-field
-                            v-model="email"
-                            type="email"
-                            placeholder="you@example.com"
-                            autocomplete="email"
-                            prepend-inner-icon="mdi-email-outline"
-                            variant="outlined"
-                            density="comfortable"
-                            color="primary"
-                            hide-details="auto"
-                            :disabled="auth.loading"
-                            class="field-input"
-                            @keyup.enter="handleLogin"
-                        />
-                    </div>
-
-                    <div class="field-group">
-                        <div class="field-label-row">
-                            <label class="field-label">Password</label>
-                            <a class="forgot-link" href="#" @click.prevent>Forgot password?</a>
-                        </div>
-                        <v-text-field
-                            v-model="password"
-                            :type="showPassword ? 'text' : 'password'"
-                            placeholder="••••••••"
-                            autocomplete="current-password"
-                            prepend-inner-icon="mdi-lock-outline"
-                            :append-inner-icon="showPassword ? 'mdi-eye-off-outline' : 'mdi-eye-outline'"
-                            variant="outlined"
-                            density="comfortable"
-                            color="primary"
-                            hide-details="auto"
-                            :disabled="auth.loading"
-                            class="field-input"
-                            @click:append-inner="showPassword = !showPassword"
-                            @keyup.enter="handleLogin"
-                        />
-                    </div>
-
-                    <!-- Error -->
-                    <transition name="fade-err">
-                        <div v-if="auth.error" class="error-banner">
-                            <v-icon size="18" color="error">mdi-alert-circle-outline</v-icon>
-                            <span>{{ auth.error }}</span>
-                        </div>
-                    </transition>
-
-                    <!-- Botón -->
-                    <v-btn
-                        type="submit"
-                        color="primary"
-                        size="large"
-                        block
-                        rounded="lg"
-                        :loading="auth.loading"
-                        :disabled="!canSubmit"
-                        class="signin-btn"
-                        elevation="0"
-                    >
-                        <template v-if="!auth.loading">
-                            Sign In
-                            <v-icon end size="18">mdi-arrow-right</v-icon>
-                        </template>
-                    </v-btn>
-
-                </v-form>
-
-                <!-- Divider -->
-                <div class="card-divider">
-                    <span class="divider-line" />
-                    <span class="divider-text">Secure login</span>
-                    <span class="divider-line" />
-                </div>
-
-                <!-- Trust badges -->
-                <div class="trust-badges">
-                    <span class="trust-badge">
-                        <v-icon size="14" color="success">mdi-shield-check-outline</v-icon>
-                        Encrypted
-                    </span>
-                    <span class="trust-badge">
-                        <v-icon size="14" color="primary">mdi-lock-outline</v-icon>
-                        JWT Auth
-                    </span>
-                    <span class="trust-badge">
-                        <v-icon size="14" color="warning">mdi-clock-outline</v-icon>
-                        Auto-refresh
-                    </span>
-                </div>
-
-            </div>
-        </div>
+              <v-btn
+                type="submit"
+                block
+                size="large"
+                class="login-btn mt-5"
+                :loading="auth.loading"
+                :disabled="!canSubmit"
+              >
+                Continue
+              </v-btn>
+            </v-form>
+          </v-card-text>
+        </v-card>
+      </div>
     </div>
+  </v-theme-provider>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { useRouter, useRoute } from 'vue-router'
+import { computed, ref, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/stores/auth/useAuth'
-import logoUrl from '@/assets/Logos/Logocarro.png'
+import LoginBackdrop from '@/components/Login/LoginBackdrop.vue'
 
 const router = useRouter()
-const route  = useRoute()
-const auth   = useAuth()
+const route = useRoute()
+const auth = useAuth()
 
-const email        = ref('')
-const password     = ref('')
+const employeeNumber = ref('')
+const password = ref('')
 const showPassword = ref(false)
 
-const canSubmit = computed(() => !!email.value && !!password.value && !auth.loading)
+const hasError = computed(() => !!auth.error)
 
-const handleLogin = async () => {
-    if (!canSubmit.value) return
-    const ok = await auth.login(email.value, password.value)
-    if (ok) {
-        const redirect = (route.query.redirect as string) || '/test'
-        router.replace(redirect)
-    }
+const canSubmit = computed(
+  () => !!employeeNumber.value.trim() && !!password.value && !auth.loading,
+)
+
+// Al corregir los datos se retira el error: mantenerlo visible mientras el
+// usuario reescribe sugiere que el nuevo valor también ha fallado.
+watch([employeeNumber, password], () => {
+  if (auth.error) auth.error = null
+})
+
+async function handleLogin(): Promise<void> {
+  if (!canSubmit.value) return
+
+  const ok = await auth.login(employeeNumber.value, password.value)
+  if (!ok) return
+
+  const redirect = (route.query.redirect as string) || '/screenshots'
+  await router.replace(redirect)
 }
 </script>
 
 <style scoped>
-/* ─── Layout raíz ─────────────────────────────────────────────────── */
+/* ===== Fondo ===== */
+/* Llena el `v-main` de App.vue (ya es `height: 100%` + `overflow-y: auto`
+   por app.scss) en vez de imponer su propio 100dvh — evitaría un doble
+   cálculo de alto y un scroll interno espurio. */
 .login-root {
-    display: flex;
-    min-height: 100vh;
-    width: 100%;
-    background-color: #F4F6FA;
+  position: relative;
+  height: 100%;
+  overflow: hidden;
 }
 
-/* ─── Panel izquierdo: Hero ────────────────────────────────────────── */
-.login-hero {
-    flex: 0 0 48%;
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(145deg, #1e3a8a 0%, #2563eb 55%, #1d4ed8 100%);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 56px 52px;
+.login-center {
+  position: relative;
+  z-index: 5;
+  min-height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--app-space-6) var(--app-gutter);
 }
 
-/* Patrón de puntos / grid */
-.hero-grid {
-    position: absolute;
-    inset: 0;
-    background-image:
-        radial-gradient(circle, rgba(255,255,255,0.12) 1px, transparent 1px);
-    background-size: 32px 32px;
-    pointer-events: none;
+.login-stack {
+  width: 100%;
+  max-width: 25rem;
 }
 
-/* Círculos decorativos */
-.hero-circle {
-    position: absolute;
-    border-radius: 50%;
-    pointer-events: none;
-}
-.hero-circle--lg {
-    width: 520px;
-    height: 520px;
-    top: -180px;
-    right: -180px;
-    background: radial-gradient(circle, rgba(255,255,255,0.07) 0%, transparent 70%);
-    border: 1px solid rgba(255,255,255,0.08);
-}
-.hero-circle--sm {
-    width: 280px;
-    height: 280px;
-    bottom: -80px;
-    left: -80px;
-    background: radial-gradient(circle, rgba(99,163,255,0.15) 0%, transparent 70%);
-}
-
-.hero-content {
-    position: relative;
-    z-index: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 40px;
-    width: 100%;
-    max-width: 420px;
-}
-
-/* Brand */
-.hero-brand {
-    display: flex;
-    align-items: center;
-    gap: 14px;
-}
-.hero-logo-wrap {
-    width: 52px;
-    height: 52px;
-    border-radius: 14px;
-    background: rgba(255,255,255,0.15);
-    backdrop-filter: blur(8px);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid rgba(255,255,255,0.2);
-    overflow: hidden;
-    flex-shrink: 0;
-}
-.hero-logo-img {
-    width: 40px;
-    height: 40px;
-    object-fit: contain;
-}
-.hero-brand-text {
-    display: flex;
-    flex-direction: column;
-}
-.hero-brand-name {
-    color: #fff;
-    font-size: 1.1rem;
-    font-weight: 700;
-    line-height: 1.2;
-    letter-spacing: -0.01em;
-}
-.hero-brand-sub {
-    color: rgba(255,255,255,0.65);
-    font-size: 0.75rem;
-    letter-spacing: 0.01em;
-}
-
-/* Pitch */
-.hero-headline {
-    color: #fff;
-    font-size: clamp(1.9rem, 3vw, 2.6rem);
-    font-weight: 800;
-    line-height: 1.18;
-    letter-spacing: -0.03em;
-    margin: 0 0 16px;
-}
-.hero-subline {
-    color: rgba(255,255,255,0.72);
-    font-size: 1rem;
-    line-height: 1.65;
-    margin: 0;
-    max-width: 360px;
-}
-
-/* Feature chips */
-.hero-chips {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-.hero-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    background: rgba(255,255,255,0.1);
-    border: 1px solid rgba(255,255,255,0.18);
-    backdrop-filter: blur(6px);
-    border-radius: 999px;
-    padding: 7px 16px;
-    font-size: 0.82rem;
-    color: rgba(255,255,255,0.9);
-    width: fit-content;
-    font-weight: 500;
-}
-.hero-chip-dot {
-    width: 7px;
-    height: 7px;
-    border-radius: 50%;
-    background: #86efac;
-    flex-shrink: 0;
-    box-shadow: 0 0 6px #86efac;
-}
-
-.hero-footer {
-    color: rgba(255,255,255,0.38);
-    font-size: 0.73rem;
-    margin: 0;
-}
-
-/* ─── Panel derecho: Formulario ────────────────────────────────────── */
-.login-form-panel {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 32px 24px;
-}
-
-/* Mobile brand */
-.mobile-brand {
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 28px;
-    position: absolute;
-    top: 24px;
-    left: 24px;
-}
-.mobile-logo {
-    width: 36px;
-    height: 36px;
-    object-fit: contain;
-    border-radius: 8px;
-    background: #e8f0fe;
-}
-.mobile-brand-name {
-    font-weight: 700;
-    font-size: 1rem;
-    color: #1e3a8a;
-}
-
-/* Card */
+/* ===== Tarjeta ===== */
 .login-card {
-    width: 100%;
-    max-width: 440px;
-    background: #ffffff;
-    border-radius: 20px;
-    border: 1px solid #e2e8f0;
-    box-shadow:
-        0 1px 2px rgba(15,23,42,0.04),
-        0 8px 24px rgba(15,23,42,0.06),
-        0 24px 48px rgba(15,23,42,0.04);
-    padding: 40px 40px 32px;
+  position: relative;
+  padding: var(--app-space-6);
+  text-align: center;
+  background: rgba(var(--v-theme-surface), 0.95) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-radius: var(--app-radius-xl) !important;
+  box-shadow:
+    0 20px 40px rgba(0, 0, 0, 0.4),
+    inset 0 0 0 1px rgba(var(--v-theme-on-surface), 0.08) !important;
 }
 
-/* Card header */
-.card-header {
-    margin-bottom: 28px;
-}
-.card-icon-wrap {
-    width: 48px;
-    height: 48px;
-    border-radius: 12px;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    margin-bottom: 16px;
-}
-.card-title {
-    font-size: 1.5rem;
-    font-weight: 700;
-    color: #0f172a;
-    margin: 0 0 6px;
-    letter-spacing: -0.02em;
-}
-.card-subtitle {
-    font-size: 0.875rem;
-    color: #64748b;
-    margin: 0;
+/* Filete claro del contorno — el mismo recurso que en go-nova para separar
+   la tarjeta del fondo sin depender de una sombra dura. */
+.login-card::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(var(--v-theme-on-surface), 0.85);
+  border-radius: inherit;
+  pointer-events: none;
 }
 
-/* Formulario */
-.card-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-.field-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.field-label-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-}
-.field-label {
-    font-size: 0.82rem;
-    font-weight: 600;
-    color: #374151;
-    letter-spacing: 0.01em;
-}
-.field-input :deep(.v-field) {
-    border-radius: 10px;
-}
-.forgot-link {
-    font-size: 0.78rem;
-    color: #2563eb;
-    text-decoration: none;
-    font-weight: 500;
-    transition: color 0.2s;
-}
-.forgot-link:hover {
-    color: #1d4ed8;
-    text-decoration: underline;
+.login-card__wordmark {
+  margin: 0 0 var(--app-space-6);
+  font-size: var(--app-text-5xl);
+  font-weight: 700;
+  letter-spacing: var(--app-tracking-tighter);
+  color: rgb(var(--v-theme-on-surface));
 }
 
-/* Error banner */
-.error-banner {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
-    border-radius: 10px;
-    padding: 10px 14px;
-    font-size: 0.84rem;
-    color: #b91c1c;
-    font-weight: 500;
+.login-card__wordmark-accent {
+  color: rgb(var(--v-theme-login-navy));
 }
 
-/* Botón */
-.signin-btn {
-    height: 48px !important;
-    font-size: 0.95rem !important;
-    letter-spacing: 0.01em !important;
-    margin-top: 4px;
-    background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
-    box-shadow: 0 4px 14px rgba(37,99,235,0.35) !important;
-    transition: box-shadow 0.2s, transform 0.15s !important;
-}
-.signin-btn:hover:not(:disabled) {
-    box-shadow: 0 6px 20px rgba(37,99,235,0.45) !important;
-    transform: translateY(-1px);
+.login-card__title {
+  font-size: var(--app-text-xl);
+  font-weight: 600;
+  letter-spacing: var(--app-tracking-tighter);
+  line-height: 1.2;
+  margin: 0;
+  color: rgb(var(--v-theme-on-surface));
 }
 
-/* Divider */
-.card-divider {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin: 24px 0 16px;
-}
-.divider-line {
-    flex: 1;
-    height: 1px;
-    background: #e2e8f0;
-}
-.divider-text {
-    font-size: 0.72rem;
-    color: #94a3b8;
-    font-weight: 500;
-    white-space: nowrap;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
+.login-card__error {
+  margin: 0;
+  padding-inline-start: var(--app-space-3);
+  border-inline-start: 2px solid rgb(var(--v-theme-error));
+  font-size: var(--app-text-sm);
+  color: rgb(var(--v-theme-error));
+  text-align: left;
 }
 
-/* Trust badges */
-.trust-badges {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    flex-wrap: wrap;
-}
-.trust-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    font-size: 0.74rem;
-    color: #64748b;
-    font-weight: 500;
+/* ===== Formulario ===== */
+.login-form {
+  text-align: left;
 }
 
-/* Transición error */
-.fade-err-enter-active, .fade-err-leave-active {
-    transition: opacity 0.25s, transform 0.25s;
-}
-.fade-err-enter-from, .fade-err-leave-to {
-    opacity: 0;
-    transform: translateY(-6px);
+/* Campos oscuros "solo-filled": el mismo tratamiento que go-nova, adaptado a
+   los tokens de NIO en vez de hex sueltos. */
+.login-field :deep(.v-field) {
+  background: rgba(var(--v-theme-on-surface), 0.05);
+  border-radius: var(--app-radius-sm);
 }
 
-/* ─── Mobile ───────────────────────────────────────────────────────── */
-@media (max-width: 959px) {
-    .login-root {
-        flex-direction: column;
-        background: linear-gradient(160deg, #1e3a8a 0%, #2563eb 100%);
-        min-height: 100vh;
-    }
-    .login-form-panel {
-        flex: 1;
-        padding: 80px 20px 40px;
-    }
-    .login-card {
-        box-shadow: 0 20px 60px rgba(0,0,0,0.25);
-    }
+.login-field :deep(.v-field:hover) {
+  background: rgba(var(--v-theme-on-surface), 0.08);
+}
+
+.login-field :deep(.v-field--focused) {
+  background: rgba(var(--v-theme-on-surface), 0.1);
+  box-shadow: inset 0 0 0 1px rgba(var(--v-theme-on-surface), 0.25);
+}
+
+.login-field :deep(.v-label) {
+  color: rgb(var(--v-theme-on-surface-variant));
+  opacity: 1;
+}
+
+.login-field :deep(.v-field__prepend-inner .v-icon),
+.login-field :deep(.v-field__append-inner .v-icon) {
+  color: rgb(var(--v-theme-on-surface-variant));
+  opacity: 1;
+}
+
+/* El backend normaliza a mayúsculas; mostrarlo así evita confusión */
+.login-field--mono :deep(input) {
+  font-family: var(--app-font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/**
+ * Chrome/Edge pintan los campos autocompletados con su propio fondo (amarillo
+ * o azulado) sin avisar; sin este reset el formulario parece roto en cuanto
+ * el navegador autorrellena employee number o password.
+ */
+.login-field :deep(input:-webkit-autofill),
+.login-field :deep(input:-webkit-autofill:hover),
+.login-field :deep(input:-webkit-autofill:focus) {
+  -webkit-text-fill-color: rgb(var(--v-theme-on-surface));
+  caret-color: rgb(var(--v-theme-on-surface));
+  -webkit-box-shadow: 0 0 0 1000px rgb(var(--v-theme-surface-variant)) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* ===== Botón ===== */
+.login-btn {
+  font-weight: 600;
+  background: rgb(var(--v-theme-login-navy)) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+}
+
+@media (max-width: 480px) {
+  .login-card {
+    padding: var(--app-space-5);
+  }
+
+  .login-card__wordmark {
+    /* A 56px "NIO" no cabe con margen en una card de ~280px de ancho útil en
+       pantallas angostas (padding reducido + gutter) — un escalón menos que
+       en desktop, sigue siendo notablemente más grande que el resto de la
+       interfaz. */
+    font-size: var(--app-text-4xl);
+    margin-bottom: var(--app-space-5);
+  }
 }
 </style>

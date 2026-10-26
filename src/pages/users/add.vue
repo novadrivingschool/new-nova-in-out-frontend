@@ -1,284 +1,493 @@
 <template>
-  <div class="d-flex ga-3 align-center mb-5">
-    <v-btn
-      icon="mdi-arrow-left"
-      variant="text"
-      density="compact"
-      @click="router.push('/users')"
+  <PageContainer variant="constrained">
+    <PageHeader
+      title="Add new user"
+      subtitle="Create a new system user account"
+      back-to="/users"
     />
-    <p class="text-h6 font-weight-bold mb-0">Add New User</p>
-  </div>
 
-  <v-card variant="flat" class="pa-4">
-    <v-form ref="formRef" v-model="isFormValid">
-      <!-- <div class="d-flex justify-center mb-4">
-        <v-avatar :size="xs ? '80' : '100'" color="grey-lighten-2">
-          <v-icon
-            color="primary"
-            :size="xs ? '20' : '30'"
-            style="cursor: pointer"
-          >
-            mdi-pencil
-          </v-icon>
-        </v-avatar> -->
-      <!-- </div> -->
+    <v-form ref="formRef" v-model="isFormValid" @submit.prevent="handleCreate">
+      <!-- ═══ Información básica ═══ -->
+      <v-card class="mb-4">
+        <div class="form-section__head">
+          <span class="app-eyebrow">Basic information</span>
+        </div>
+        <v-divider />
 
-      <p class="font-weight-medium text-h6">Basic Information</p>
-      <v-divider color="grey my-4"></v-divider>
-
-      <v-row>
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">First Name</v-label>
-          <v-text-field
-            v-model="formData.profile.firstName"
-            :rules="[rules.required]"
-            variant="outlined"
-            density="compact"
-            placeholder="John"
-          />
-        </v-col>
-
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Last Name</v-label>
-          <v-text-field
-            v-model="formData.profile.lastName"
-            :rules="[rules.required]"
-            variant="outlined"
-            density="compact"
-            placeholder="Doe"
-          />
-        </v-col>
-
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Phone Number</v-label>
-          <v-text-field
-            v-model="formData.profile.phone"
-            :rules="[rules.phoneMax, rules.phonePattern]"
-            variant="outlined"
-            density="compact"
-            maxlength="16"
-            placeholder="+1..."
-          />
-        </v-col>
-
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Birthdate</v-label>
-          <v-menu
-            v-model="menuDate"
-            :close-on-content-click="false"
-            transition="scale-transition"
-            min-width="auto"
-          >
-            <template v-slot:activator="{ props }">
+        <div class="form-section__body">
+          <v-row>
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">First name *</v-label>
               <v-text-field
-                v-bind="props"
-                v-model="formData.profile.birthdate"
-                variant="outlined"
-                density="compact"
-                append-inner-icon="mdi-calendar"
-                readonly
-                placeholder="YYYY-MM-DD"
+                v-model="formData.profile.firstName"
+                :rules="[rules.required]"
+                :density="density"
+                placeholder="John"
+                autocomplete="given-name"
+                @update:model-value="recalcUsername"
               />
-            </template>
-            <v-date-picker
-              v-model="datePickerValue"
-              @update:model-value="onDateSelected"
-              color="primary"
-            />
-          </v-menu>
-        </v-col>
+            </v-col>
 
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Gender</v-label>
-          <v-select
-            v-model="formData.profile.gender as Gender"
-            :items="Object.values(Gender)"
-            variant="outlined"
-            density="compact"
-            :rules="[rules.required]"
-          />
-        </v-col>
-      </v-row>
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">Last name *</v-label>
+              <v-text-field
+                v-model="formData.profile.lastName"
+                :rules="[rules.required]"
+                :density="density"
+                placeholder="Doe"
+                autocomplete="family-name"
+                @update:model-value="recalcUsername"
+              />
+            </v-col>
 
-      <p class="font-weight-medium mt-4 text-h6">Authentication</p>
-      <v-divider color="grey my-4"></v-divider>
-      <v-row>
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Email Address</v-label>
-          <v-text-field
-            v-model="formData.email"
-            :rules="[rules.email]"
-            variant="outlined"
-            density="compact"
-            placeholder="john.doe@example.com"
-          />
-        </v-col>
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">Phone number</v-label>
+              <v-text-field
+                v-model="formData.profile.phone"
+                :rules="[rules.phoneMax, rules.phonePattern]"
+                :density="density"
+                maxlength="16"
+                placeholder="+1…"
+                inputmode="tel"
+                autocomplete="tel"
+              />
+            </v-col>
 
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">User Name</v-label>
-          <v-text-field
-            v-model="formData.profile.userName"
-            :rules="[rules.userNameMax]"
-            variant="outlined"
-            density="compact"
-            placeholder="john.doe@example.com"
-          />
-        </v-col>
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">Birthdate</v-label>
+              <v-menu
+                v-model="menuDate"
+                :close-on-content-click="false"
+                transition="scale-transition"
+              >
+                <template #activator="{ props: menuProps }">
+                  <v-text-field
+                    v-bind="menuProps"
+                    v-model="formData.profile.birthdate"
+                    :density="density"
+                    append-inner-icon="mdi-calendar"
+                    readonly
+                    placeholder="YYYY-MM-DD"
+                  />
+                </template>
+                <v-date-picker
+                  v-model="datePickerValue"
+                  :max="maxBirthdate"
+                  color="primary"
+                  @update:model-value="onDateSelected"
+                />
+              </v-menu>
+            </v-col>
 
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Password</v-label>
-          <v-text-field
-            v-model="formData.password"
-            :rules="[rules.required, rules.passwordMin]"
-            variant="outlined"
-            density="compact"
-            type="password"
-            placeholder="********"
-          />
-        </v-col>
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">Gender</v-label>
+              <!--
+                Sin `v-model`: al limpiarlo, `v-select` emite `null`, y el DTO
+                del perfil usa `undefined` para "sin valor". Se normaliza aquí.
+              -->
+              <v-select
+                :model-value="formData.profile.gender ?? null"
+                :items="genderOptions"
+                :density="density"
+                clearable
+                @update:model-value="formData.profile.gender = $event ?? undefined"
+              />
+            </v-col>
+          </v-row>
+        </div>
+      </v-card>
 
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Confirm Password</v-label>
-          <v-text-field
-            v-model="confirmPassword"
-            :rules="[rules.required, rules.passwordMatch]"
-            variant="outlined"
-            density="compact"
-            type="password"
-            placeholder="********"
-          />
-        </v-col>
-      </v-row>
+      <!-- ═══ Acceso ═══ -->
+      <v-card class="mb-4">
+        <div class="form-section__head">
+          <span class="app-eyebrow">Access</span>
+        </div>
+        <v-divider />
+
+        <div class="form-section__body">
+          <p class="form-note">
+            The employee number is generated automatically on save and is what
+            the user will enter to sign in.
+          </p>
+
+          <v-row>
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">Email address</v-label>
+              <v-text-field
+                v-model="formData.email"
+                :rules="[rules.email]"
+                :density="density"
+                type="email"
+                placeholder="john.doe@example.com"
+                autocomplete="email"
+              />
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">
+                Username
+                <v-chip
+                  v-if="usernameAutoGenerated"
+                  size="x-small"
+                  color="primary"
+                  variant="tonal"
+                  class="ml-1"
+                >
+                  auto
+                </v-chip>
+              </v-label>
+              <v-text-field
+                v-model="formData.profile.userName"
+                :rules="[rules.userNameMax]"
+                :error-messages="usernameError"
+                :density="density"
+                placeholder="johnD"
+                hint="Auto-generated from the name. Editable."
+                persistent-hint
+                @update:model-value="onUsernameManualEdit"
+              />
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">External employee number</v-label>
+              <v-text-field
+                v-model="formData.profile.external_employee_number"
+                :rules="[rules.externalEmployeeNumber]"
+                :error-messages="externalEmployeeNumberError"
+                :density="density"
+                maxlength="50"
+                placeholder="e.g. 48213"
+                autocomplete="off"
+                spellcheck="false"
+                hint="From the external HR app. Optional, must be unique."
+                persistent-hint
+                @update:model-value="externalEmployeeNumberError = ''"
+              />
+            </v-col>
+
+            <v-col v-bind="fieldColsWide">
+              <v-label class="form-label">Roles *</v-label>
+              <v-select
+                v-model="formData.roles"
+                :items="roleOptions"
+                :rules="[rules.rolesRequired]"
+                :density="density"
+                multiple
+                chips
+                closable-chips
+                hint="Determines what the user can access."
+                persistent-hint
+              />
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">Password *</v-label>
+              <v-text-field
+                v-model="formData.password"
+                :rules="[rules.required, rules.passwordMin]"
+                :density="density"
+                :type="showPassword ? 'text' : 'password'"
+                placeholder="Min 8 characters"
+                autocomplete="new-password"
+                :append-inner-icon="showPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                @click:append-inner="showPassword = !showPassword"
+              />
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="form-label">Confirm password *</v-label>
+              <v-text-field
+                v-model="confirmPassword"
+                :rules="[rules.required, rules.passwordMatch]"
+                :density="density"
+                :type="showConfirm ? 'text' : 'password'"
+                placeholder="Repeat password"
+                autocomplete="new-password"
+                :append-inner-icon="showConfirm ? 'mdi-eye-off' : 'mdi-eye'"
+                @click:append-inner="showConfirm = !showConfirm"
+              />
+            </v-col>
+
+            <v-col cols="12">
+              <v-switch
+                v-model="formData.isActive"
+                color="primary"
+                :label="formData.isActive
+                  ? 'Active — the user can sign in immediately'
+                  : 'Inactive — the user cannot sign in yet'"
+              />
+            </v-col>
+          </v-row>
+        </div>
+      </v-card>
+
+      <!-- ═══ Acciones ═══ -->
+      <div class="form-actions">
+        <v-btn variant="text" :size="btnSize" @click="router.push('/users')">
+          Cancel
+        </v-btn>
+        <v-btn
+          type="submit"
+          color="primary"
+          variant="flat"
+          :size="btnSize"
+          :loading="loading"
+          prepend-icon="mdi-account-plus"
+        >
+          Create user
+        </v-btn>
+      </div>
     </v-form>
 
-    <div class="d-flex justify-end ga-2 mt-6">
-      <v-btn variant="text" @click="router.push('/users')">Cancel</v-btn>
-      <v-btn
-        color="primary"
-        @click="handleCreate"
-        :loading="loading"
-        :disabled="!isFormValid"
-      >
-        Create User
-      </v-btn>
-    </div>
-  </v-card>
-
-  <v-snackbar
-    v-model="snackbar.show"
-    :color="snackbar.color"
-    :timeout="3000"
-    location="top right"
-  >
-    {{ snackbar.text }}
-
-    <template v-slot:actions>
-      <v-btn variant="text" @click="snackbar.show = false"> Close </v-btn>
-    </template>
-  </v-snackbar>
+    <v-snackbar
+      v-model="snackbar.show"
+      :color="snackbar.color"
+      :timeout="snackbar.timeout"
+    >
+      {{ snackbar.text }}
+      <template #actions>
+        <v-btn variant="text" @click="snackbar.show = false">Close</v-btn>
+      </template>
+    </v-snackbar>
+  </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue";
-import { useRouter } from "vue-router";
-import { Gender, type CreateUserDto } from "@/types/auth";
-import { useDisplay } from "vuetify";
-import { usersService } from "@/services/users.service";
+import { reactive, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { Gender, Role, type CreateUserDto } from '@/types/auth'
+import { usersService } from '@/services/users.service'
+import { useResponsive } from '@/composables/useResponsive'
+import PageContainer from '@/components/common/PageContainer.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
 
-const router = useRouter();
-const { smAndDown, xs } = useDisplay();
+const router = useRouter()
+const { density, btnSize, fieldCols, fieldColsWide } = useResponsive()
 
 interface FormState extends CreateUserDto {
-  profile: NonNullable<CreateUserDto["profile"]>; // Esto obliga a que profile exista
+  profile: NonNullable<CreateUserDto['profile']>
 }
+
+const formRef = ref<any>(null)
+const isFormValid = ref(false)
+const loading = ref(false)
+const menuDate = ref(false)
+const datePickerValue = ref(null)
+const showPassword = ref(false)
+const showConfirm = ref(false)
+const usernameAutoGenerated = ref(true)
+const usernameError = ref('')
+const externalEmployeeNumberError = ref('')
+const confirmPassword = ref('secreto123')
+
+const formData = reactive<FormState>({
+  email: '',
+  password: 'secreto123',
+  // Antes se enviaba `[]`, con lo que el backend aplicaba su valor por defecto
+  // (`customer`) y era imposible crear un admin o un employee desde la interfaz.
+  roles: [Role.EMPLOYEE],
+  isActive: true,
+  profile: {
+    firstName: '',
+    lastName: '',
+    phone: '',
+    birthdate: '',
+    gender: undefined,
+    avatarUrl: '',
+    userName: '',
+    external_employee_number: '',
+  },
+})
+
+const genderOptions: string[] = Object.values(Gender)
+
+const roleOptions = Object.values(Role).map((role) => ({
+  title: role.replace(/_/g, ' '),
+  value: role,
+}))
+
+/** Nadie con menos de 16 años puede ser dado de alta como empleado. */
+const maxBirthdate = new Date(
+  new Date().setFullYear(new Date().getFullYear() - 16),
+)
+  .toISOString()
+  .slice(0, 10)
 
 const snackbar = reactive({
   show: false,
-  text: "",
-  color: "success",
-});
+  text: '',
+  color: 'success',
+  icon: 'mdi-check-circle',
+  timeout: 4000,
+})
 
-// Refs para el form y UI
-const formRef = ref<any>(null);
-const isFormValid = ref(false);
-const loading = ref(false);
-const menuDate = ref(false);
-const datePickerValue = ref(null);
-const confirmPassword = ref("");
-
-// Objeto inicial vacío para creación
-const formData = reactive<FormState>({
-  email: "",
-  password: "",
-  isActive: false,
-  roles: [],
-  profile: {
-    firstName: "",
-    lastName: "",
-    phone: "",
-    birthdate: "",
-    gender: undefined,
-    avatarUrl: "",
-  },
-});
-
-// Reglas de validación
 const rules = {
-  required: (v: any) => !!v || "Required",
-  email: (v: string) => !v || /.+@.+\..+/.test(v) || "E-mail must be valid",
-  passwordMin: (v: string) => (v && v.length >= 8) || "Min 8 characters",
-  userNameMax: (v: string) => v.length <= 200 || "Max 200 characters",
-  phoneMax: (v: string) => v?.length <= 16 || "Max 16 characters",
+  required: (v: unknown) => !!v || 'Required',
+  email: (v: string) => !v || /.+@.+\..+/.test(v) || 'Invalid email',
+  passwordMin: (v: string) => (!!v && v.length >= 8) || 'Min 8 characters',
+  userNameMax: (v: string) => !v || v.length <= 200 || 'Max 200 characters',
+  phoneMax: (v: string) => !v || v.length <= 16 || 'Max 16 characters',
   phonePattern: (v: string) =>
-    /^[+0-9]*$/.test(v) || "Only numbers and + allowed",
+    !v || /^[+0-9]*$/.test(v) || 'Only numbers and + allowed',
   passwordMatch: (v: string) =>
-    v === formData.password || "Passwords do not match",
-};
+    v === formData.password || 'Passwords do not match',
+  rolesRequired: (v: Role[]) => (!!v && v.length > 0) || 'Pick at least one role',
+  externalEmployeeNumber: (v?: string) =>
+    !v || v.trim().length <= 50 || 'Max 50 characters',
+}
 
-const onDateSelected = (val: any) => {
-  if (val) {
-    const d = new Date(val);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    formData.profile.birthdate = `${year}-${month}-${day}`;
-    menuDate.value = false;
+/**
+ * Vuetify no reevalúa el campo de confirmación cuando cambia el original, así
+ * que un usuario podía dejar dos contraseñas distintas sin ver ningún error.
+ */
+watch(
+  () => formData.password,
+  () => {
+    if (confirmPassword.value) formRef.value?.validate()
+  },
+)
+
+function buildUsername(firstName: string, lastName: string): string {
+  const first = firstName.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
+  const initial = lastName.trim()[0]?.toUpperCase() ?? ''
+  return `${first}${initial}`
+}
+
+function recalcUsername(): void {
+  if (!usernameAutoGenerated.value) return
+  const first = formData.profile.firstName ?? ''
+  const last = formData.profile.lastName ?? ''
+  if (first || last) formData.profile.userName = buildUsername(first, last)
+  usernameError.value = ''
+}
+
+function onUsernameManualEdit(): void {
+  usernameAutoGenerated.value = false
+  usernameError.value = ''
+}
+
+function onDateSelected(value: unknown): void {
+  if (!value) return
+  const date = new Date(value as string)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  formData.profile.birthdate = `${year}-${month}-${day}`
+  menuDate.value = false
+}
+
+function showSnackbar(
+  text: string,
+  color: 'success' | 'error' | 'warning' | 'info',
+  timeout = 4000,
+): void {
+  const icons = {
+    success: 'mdi-check-circle',
+    error: 'mdi-alert-circle',
+    warning: 'mdi-alert',
+    info: 'mdi-information',
   }
-};
+  snackbar.text = text
+  snackbar.color = color
+  snackbar.icon = icons[color]
+  snackbar.timeout = timeout
+  snackbar.show = true
+}
 
-const handleCreate = async () => {
-  const { valid } = await formRef.value.validate();
-  if (!valid) return;
+function parseBackendError(error: any): string {
+  const message = error?.message ?? error?.error ?? ''
+  if (Array.isArray(message)) return message[0]
+  if (typeof message === 'string' && message) {
+    const lower = message.toLowerCase()
+    if (lower.includes('email already')) return 'That email is already registered.'
+    if (lower.includes('external employee number already')) {
+      return 'That external employee number is already assigned to another user.'
+    }
+    if (lower.includes('username already')) {
+      return 'That username is already taken. Try a different one.'
+    }
+    return message
+  }
+  return 'An unexpected error occurred. Please try again.'
+}
 
-  loading.value = true;
+async function handleCreate(): Promise<void> {
+  const { valid } = await formRef.value.validate()
+  if (!valid) return
+
+  usernameError.value = ''
+  externalEmployeeNumberError.value = ''
+  loading.value = true
+
   try {
-    console.log("PAYLOAD", formData);
-
-    const finalPayload = {
+    // Los campos vacíos se omiten: el backend distingue "sin valor" de "".
+    await usersService.createUser({
       ...formData,
-      email: formData.email?.length === 0 ? undefined : formData.email,
-      isActive: true,
-    };
+      email: formData.email?.trim() || undefined,
+      profile: {
+        ...formData.profile,
+        phone: formData.profile.phone?.trim() || undefined,
+        birthdate: formData.profile.birthdate || undefined,
+        userName: formData.profile.userName?.trim() || undefined,
+        avatarUrl: formData.profile.avatarUrl || undefined,
+        external_employee_number:
+          formData.profile.external_employee_number?.trim() || undefined,
+      },
+    } as CreateUserDto)
 
-    await usersService.createUser(finalPayload);
-
-    snackbar.text = "User created successfully!";
-    snackbar.color = "success";
-    snackbar.show = true;
-
-    setTimeout(() => {
-      router.push("/users");
-    }, 1500);
+    showSnackbar('User created successfully.', 'success')
+    setTimeout(() => router.push('/users'), 900)
   } catch (error: any) {
-    const errorMsg = Array.isArray(error.message)
-      ? error.message[0]
-      : error.message;
-
-    snackbar.text = errorMsg || "An unexpected error occurred";
-    snackbar.color = "error";
-    snackbar.show = true;
+    const message = parseBackendError(error)
+    if (message.toLowerCase().includes('username')) usernameError.value = message
+    if (message.toLowerCase().includes('external employee number')) {
+      externalEmployeeNumberError.value = message
+    }
+    showSnackbar(message, 'error', 6000)
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 </script>
+
+<style scoped>
+.form-section__head {
+  padding: var(--app-space-3) var(--app-space-4);
+}
+
+.form-note {
+  margin: 0 0 var(--app-space-4);
+  font-size: var(--app-text-sm);
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.form-section__body {
+  padding: var(--app-space-4);
+}
+
+.form-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--app-text-xs);
+  font-weight: 500;
+  color: rgb(var(--v-theme-on-surface-variant));
+  opacity: 1;
+}
+
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+}
+
+@media (max-width: 600px) {
+  .form-section__body {
+    padding: var(--app-space-4);
+  }
+
+  .form-actions > * {
+    flex: 1 1 auto;
+  }
+}
+</style>

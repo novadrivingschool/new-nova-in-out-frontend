@@ -1,63 +1,82 @@
 <template>
-  <div class="d-flex ga-3 align-center mb-5">
-    <v-btn
-      icon="mdi-arrow-left"
-      variant="text"
-      density="compact"
-      @click="router.push('/users')"
+  <PageContainer variant="constrained" align="start">
+    <PageHeader
+      title="User information"
+      subtitle="View and edit user details"
+      back-to="/users"
     />
-    <p class="text-h6 font-weight-bold">User Information</p>
-  </div>
 
-  <div v-if="loading" class="d-flex justify-center pa-10">
-    <ActivityLoader :size="32" />
-  </div>
+    <ActivityLoader v-if="loading" label="Loading user…" />
 
-  <user-information v-else-if="user" :user="user" @updated="handleRefresh" />
+    <template v-else-if="user">
+      <UserInformation
+        :user="user"
+        :auto-edit="autoEdit"
+        @updated="handleUpdated"
+      />
+      <UserSchedules :user-id="user.id" />
+    </template>
 
-  <v-alert
-    v-else
-    type="error"
-    title="User not found"
-    text="The user you are looking for does not exist or has been deleted."
-    variant="tonal"
-    class="mt-4"
-  />
+    <EmptyState
+      v-else
+      title="User not found"
+      description="This user does not exist or has been deleted."
+      icon="mdi-account-question-outline"
+    >
+      <template #actions>
+        <v-btn color="primary" variant="flat" @click="router.push('/users')">
+          Back to users
+        </v-btn>
+      </template>
+    </EmptyState>
+  </PageContainer>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import { usersService } from "@/services/users.service";
-import type { UserResponse } from "@/types/auth";
-import UserInformation from "@/components/Users/UserInformation.vue";
-const route = useRoute();
-const router = useRouter();
+import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router/auto'
+import { usersService } from '@/services/users.service'
+import type { UserResponse } from '@/types/auth'
+import UserInformation from '@/components/Users/UserInformation.vue'
+import UserSchedules from '@/components/Users/UserSchedules.vue'
+import PageContainer from '@/components/common/PageContainer.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
+import ActivityLoader from '@/components/common/ActivityLoader.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 
-const user = ref<UserResponse | undefined>(undefined);
-const loading = ref(true);
+// Nombrar la ruta le da a `route.params` el tipo generado por unplugin-vue-router
+const route = useRoute('/users/[id]')
+const router = useRouter()
 
-const fetchUserData = async () => {
-  loading.value = true;
+const user = ref<UserResponse | undefined>(undefined)
+const loading = ref(true)
+const autoEdit = computed(() => route.query.edit === 'true')
+
+async function fetchUserData(): Promise<void> {
+  loading.value = true
   try {
-    // 🎯 IMPORTANTE: params no es una función, es un objeto.
-    console.log("Fetching user...");
-    // El nombre 'id' debe ser igual al nombre del archivo [id].vue
-    const id = route.params.id as string;
-    console.log("PARAMS", route.params);
-    user.value = await usersService.getOneUser(id);
-    console.log(user.value);
+    user.value = await usersService.getOneUser(route.params.id)
   } catch (error) {
-    console.error("Error fetching user:", error);
+    console.error('Error fetching user:', error)
+    user.value = undefined
   } finally {
-    loading.value = false;
+    loading.value = false
   }
-};
+}
 
-onMounted(fetchUserData);
+onMounted(fetchUserData)
 
-// Si el componente hijo emite que se actualizó, refrescamos los datos del servidor
-const handleRefresh = () => {
-  fetchUserData();
-};
+/**
+ * Tras guardar se recargan los datos y se permanece en la ficha. La versión
+ * anterior redirigía a la lista pasados 800 ms, lo que impedía encadenar varios
+ * cambios y resultaba desconcertante.
+ */
+async function handleUpdated(updated?: UserResponse): Promise<void> {
+  if (updated) {
+    user.value = updated
+    return
+  }
+  await fetchUserData()
+}
 </script>

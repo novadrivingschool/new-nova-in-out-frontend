@@ -1,131 +1,142 @@
+<!--
+  src/components/AdminDashboard/AdminDashboardFilter.vue
+
+  Barra superior del dashboard: selector de UNA fecha (date picker), botón
+  "Today", hora de la última actualización y refresco manual.
+
+  La fecha vive en el query param `?date=` (ver `useSelectedDate`); este
+  componente solo la modifica, no carga datos. La carga la hace
+  `useAttendanceDashboard` en la página.
+-->
 <template>
-  <v-card class="app-card mb-5 pa-4 pa-sm-5" elevation="0">
-    <div class="d-flex align-center ga-2 mb-5">
-      <div class="bg-primary-lighten-5 rounded-sm pa-1 d-flex align-center">
-        <v-icon color="primary" size="18">mdi-account-group-outline</v-icon>
-      </div>
-      <span class="font-weight-bold text-medium-emphasis">
-        DASHBOARD SUMMARY
-      </span>
-    </div>
-
-    <div class="d-flex ga-4 flex-wrap">
-      <v-chip
-        size="large"
-        variant="tonal"
+  <header class="dashboard-bar">
+    <v-menu v-model="menuOpen" :close-on-content-click="false">
+      <template #activator="{ props: menuProps }">
+        <v-text-field
+          v-bind="menuProps"
+          :model-value="label"
+          label="Date"
+          readonly
+          prepend-inner-icon="mdi-calendar"
+          density="compact"
+          hide-details
+          class="dashboard-bar__date"
+          aria-label="Select a date"
+        />
+      </template>
+      <v-date-picker
+        :model-value="pickerValue"
+        :max="today"
         color="primary"
-        class="stat-chip px-4"
-        @click="router.push('/Clocked-In-Now')"
-      >
-        <template v-slot:prepend>
-          <v-progress-circular
-            v-if="loading"
-            indeterminate
-            size="16"
-            width="2"
-            class="mr-2"
-          />
-          <!-- <v-icon v-else start icon="mdi-check-circle-outline" /> -->
-        </template>
-        <span class="text-h7 font-weight-bold mr-2">{{
-          stats.clockedInNowCount
-        }}</span>
-        <span class="text-caption font-weight-medium">Clocked In Now</span>
-      </v-chip>
+        hide-header
+        @update:model-value="onPick"
+      />
+    </v-menu>
 
-      <v-chip
-        size="large"
-        variant="tonal"
-        color="primary"
-        class="stat-chip px-4"
-        @click="router.push('/Clocked-In-Today')"
-      >
-        <template v-slot:prepend>
-          <v-progress-circular
-            v-if="loading"
-            indeterminate
-            size="16"
-            width="2"
-            class="mr-2"
-          />
-          <!-- <v-icon v-else start icon="mdi-calendar-check" /> -->
-        </template>
-        <span class="text-h7 font-weight-bold mr-2">{{
-          stats.clockedInTodayCount
-        }}</span>
-        <span class="text-caption font-weight-medium">Clocked In Today</span>
-      </v-chip>
+    <v-btn
+      v-if="!isToday"
+      variant="tonal"
+      size="small"
+      prepend-icon="mdi-calendar-today"
+      @click="goToToday"
+    >
+      Today
+    </v-btn>
 
-      <v-chip
-        size="large"
-        variant="tonal"
-        color="primary"
-        class="stat-chip px-4"
-        @click="router.push('/Not-Clocked-In-Now')"
-      >
-        <template v-slot:prepend>
-          <v-progress-circular
-            v-if="loading"
-            indeterminate
-            size="16"
-            width="2"
-            class="mr-2"
-          />
-          <!-- <v-icon v-else start icon="mdi-account-off-outline" /> -->
-        </template>
-        <span class="text-h7 font-weight-bold mr-2">{{
-          stats.notClockedInNowCount
-        }}</span>
-        <span class="text-caption font-weight-medium">Not Clocked In Now</span>
-      </v-chip>
-    </div>
-  </v-card>
+    <v-chip v-else size="small" variant="tonal" color="success" prepend-icon="mdi-circle-medium">
+      Live
+    </v-chip>
+
+    <v-spacer />
+
+    <span class="dashboard-bar__updated">{{ lastUpdatedLabel }}</span>
+
+    <v-btn
+      icon="mdi-refresh"
+      size="small"
+      density="comfortable"
+      aria-label="Refresh dashboard"
+      :loading="loading"
+      @click="emit('refresh')"
+    />
+  </header>
 </template>
 
 <script setup lang="ts">
-import NovaInOutServices from "@/services/NovaInOutServices";
-import { getTodayString } from "@/utils/getTodayString";
+import { computed, ref, watch } from 'vue'
+import { useRouter } from 'vue-router'
+import { useSelectedDate } from '@/composables/useSelectedDate'
+import { formatDateString, parseDateString } from '@/utils/dateString'
 
-const router = useRouter();
+const props = defineProps<{
+  loading?: boolean
+  lastUpdated: Date | null
+}>()
 
-// const getClockedInNow = async () => {
-//   await NovaInOutServices.getClockedInNow(getTodayString());
-// };
+const emit = defineEmits<{ (e: 'refresh'): void }>()
 
-let refreshInterval: any = null;
+const router = useRouter()
+const { date, isToday, label, today, syncToday } = useSelectedDate()
 
-const loading = ref(false);
+const menuOpen = ref(false)
 
-const stats = ref({
-  clockedInNowCount: 0,
-  clockedInTodayCount: 0,
-  notClockedInNowCount: 0,
-});
+/** El date picker de Vuetify trabaja con `Date`; el resto con `YYYY-MM-DD`. */
+const pickerValue = computed(() => parseDateString(date.value) ?? new Date())
 
-const loadStats = async () => {
-  loading.value = true;
-  try {
-    const data = await NovaInOutServices.getSummary(getTodayString());
-    stats.value = data;
-    console.log("STATS.VALUE", stats.value);
-  } catch (error) {
-    console.error("Error updating summary stats", error);
-  } finally {
-    loading.value = false;
-  }
-};
+const lastUpdatedLabel = computed(() => {
+  if (!props.lastUpdated) return 'Never updated'
+  return `Updated ${props.lastUpdated.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`
+})
 
-onMounted(async () => {
-  //carga inicial
-  await loadStats();
-  refreshInterval = setInterval(() => loadStats(), 30000);
-});
+// Al abrir el calendario se refresca "hoy" (la pestaña pudo cruzar medianoche).
+watch(menuOpen, (open) => {
+  if (open) syncToday()
+})
 
-onUnmounted(() => {
-  if (refreshInterval) {
-    clearInterval(refreshInterval);
-  }
-});
+function setDate(value: string | null): void {
+  router.replace({ query: value ? { date: value } : {} })
+}
+
+function onPick(value: unknown): void {
+  menuOpen.value = false
+  const picked = Array.isArray(value) ? value[0] : value
+  if (!(picked instanceof Date)) return
+
+  const iso = formatDateString(picked)
+  setDate(iso === today.value ? null : iso)
+}
+
+function goToToday(): void {
+  setDate(null)
+}
 </script>
 
-<style scoped></style>
+<style scoped>
+.dashboard-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+  margin-bottom: var(--app-space-4);
+}
+
+.dashboard-bar__date {
+  min-width: 10rem;
+  max-width: 12rem;
+}
+
+.dashboard-bar__updated {
+  font-size: var(--app-text-xs);
+  color: rgb(var(--v-theme-on-surface-variant));
+  white-space: nowrap;
+}
+
+@media (max-width: 600px) {
+  .dashboard-bar__updated {
+    display: none;
+  }
+}
+</style>

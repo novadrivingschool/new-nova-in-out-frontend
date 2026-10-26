@@ -1,73 +1,152 @@
 /**
  * src/styles/app.scss
- * Estilos globales: tipografía, tokens de spacing, utilidades, ajustes visuales
- * para Vuetify 3. Solo afectan UI/UX, no lógica.
+ *
+ * Sistema de diseño de Nova In Out.
+ *
+ * Principios:
+ *  1. Silencio. Sin ripple, sin elevaciones al hover, sin animaciones
+ *     decorativas. La interfaz responde, no actúa.
+ *  2. El color señala, no decora. El acento aparece dos veces por pantalla:
+ *     el elemento de navegación activo y la acción primaria. Todo lo demás es
+ *     escala de grises; el color sólo vuelve para comunicar estado.
+ *  3. Jerarquía por tipografía y espacio, no por cajas de colores.
+ *  4. Bordes de 1px en lugar de sombras. Las sombras se reservan para lo que
+ *     flota de verdad (menús, diálogos).
+ *  5. Ningún color literal fuera de `plugins/vuetify.ts`.
  */
 
 /* ============================================================
-   1. Tokens (CSS variables)
+   1. Escala fluida
+   ============================================================
+
+   La fuente raíz interpola con el viewport y Vuetify dimensiona en `rem`, así
+   que la interfaz entera escala sin breakpoints:
+
+     360px  → 14.0px
+     1366px → 14.6px
+     1920px → 15.2px
+     2560px → 16.0px (tope)
+
+   El recorrido es corto a propósito: esto es una herramienta de trabajo con
+   mucha información en pantalla, no una página de producto.
    ============================================================ */
 :root {
-  --app-radius-xs: 6px;
-  --app-radius-sm: 8px;
-  --app-radius-md: 12px;
-  --app-radius-lg: 16px;
-  --app-radius-xl: 20px;
+  --app-font-size-root: clamp(0.875rem, 0.83rem + 0.1vw, 1rem);
 
-  --app-space-1: 4px;
-  --app-space-2: 8px;
-  --app-space-3: 12px;
-  --app-space-4: 16px;
-  --app-space-5: 20px;
-  --app-space-6: 24px;
-  --app-space-8: 32px;
-  --app-space-10: 40px;
+  --app-font-family:
+    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --app-font-mono:
+    ui-monospace, "SF Mono", "Cascadia Mono", "Roboto Mono", Menlo, monospace;
 
-  --app-shadow-sm:
-    0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 3px rgba(15, 23, 42, 0.06);
-  --app-shadow-md:
-    0 4px 6px -1px rgba(15, 23, 42, 0.08), 0 2px 4px -2px rgba(15, 23, 42, 0.06);
-  --app-shadow-lg:
-    0 10px 25px -5px rgba(15, 23, 42, 0.12),
-    0 8px 10px -6px rgba(15, 23, 42, 0.08);
+  /* ── Escala tipográfica ────────────────────────────────── */
+  --app-text-2xs: 0.6875rem; /* 11px — etiquetas de columna        */
+  --app-text-xs: 0.75rem; /* 12px — metadatos                   */
+  --app-text-sm: 0.8125rem; /* 13px — interfaz por defecto        */
+  --app-text-base: 0.875rem; /* 14px — cuerpo                      */
+  --app-text-md: 0.9375rem; /* 15px — títulos de tarjeta          */
+  --app-text-lg: 1.0625rem; /* 17px — títulos de sección          */
+  --app-text-xl: 1.25rem; /* 20px — título de página            */
+  --app-text-2xl: 1.5rem;
+  --app-text-3xl: 1.875rem;
+  --app-text-4xl: 2.25rem;
+  --app-text-5xl: 3.5rem; /* 56px — wordmark del login           */
 
-  --app-transition: 180ms cubic-bezier(0.4, 0, 0.2, 1);
+  /* Interletrado: negativo en títulos, ligeramente abierto en versalitas */
+  --app-tracking-tight: -0.011em;
+  --app-tracking-tighter: -0.02em;
+  --app-tracking-wide: 0.04em;
+
+  /* ── Espaciado ─────────────────────────────────────────── */
+  --app-space-1: 0.25rem;
+  --app-space-2: 0.5rem;
+  --app-space-3: 0.75rem;
+  --app-space-4: 1rem;
+  --app-space-5: 1.25rem;
+  --app-space-6: 1.5rem;
+  --app-space-8: 2rem;
+  --app-space-10: 2.5rem;
+  --app-space-12: 3rem;
+
+  /** Padding de página: 16px en móvil → 32px en 4K. */
+  --app-gutter: clamp(1rem, 0.85rem + 0.55vw, 2rem);
+
+  /* ── Anchos de contenido ───────────────────────────────── */
+  --app-width-narrow: 34rem;
+  --app-width-constrained: 64rem;
+  --app-width-wide: 90rem;
+
+  /* ── Radios ────────────────────────────────────────────── */
+  --app-radius-xs: 4px;
+  --app-radius-sm: 6px;
+  --app-radius-md: 6px;
+  --app-radius-lg: 8px;
+  --app-radius-xl: 10px;
+  --app-radius-full: 999px;
+
+  /* ── Elevación: sólo para lo que flota ─────────────────── */
+  --app-shadow-overlay:
+    0 1px 1px rgba(0, 0, 0, 0.02), 0 4px 8px -2px rgba(0, 0, 0, 0.06),
+    0 12px 24px -6px rgba(0, 0, 0, 0.08);
+
+  /* ── Movimiento ────────────────────────────────────────── */
+  --app-duration: 80ms;
+  --app-ease: linear;
+  --app-transition: var(--app-duration) var(--app-ease);
+
+  /* ── Cromo ─────────────────────────────────────────────── */
+  --app-bar-height: 48px;
+  --app-drawer-width: 216px;
+  --app-drawer-rail-width: 52px;
+  --app-row-height: 36px;
 }
 
 .v-theme--dark {
-  --app-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
-  --app-shadow-md:
-    0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
-  --app-shadow-lg:
-    0 10px 25px -5px rgba(0, 0, 0, 0.55), 0 8px 10px -6px rgba(0, 0, 0, 0.45);
+  --app-shadow-overlay:
+    0 1px 1px rgba(0, 0, 0, 0.3), 0 4px 8px -2px rgba(0, 0, 0, 0.5),
+    0 12px 24px -6px rgba(0, 0, 0, 0.6);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ============================================================
-   2. Reset y tipografía
+   2. Base
    ============================================================ */
+html {
+  font-size: var(--app-font-size-root);
+  scroll-padding-top: calc(var(--app-bar-height) + var(--app-space-4));
+}
+
 html,
 body {
-  font-family:
-    "Inter",
-    "Roboto",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif;
+  margin: 0;
+  font-family: var(--app-font-family);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
 }
 
 .v-application {
-  font-family:
-    "Inter",
-    "Roboto",
-    -apple-system,
-    BlinkMacSystemFont,
-    "Segoe UI",
-    sans-serif !important;
-  letter-spacing: 0.01em;
+  font-family: var(--app-font-family) !important;
+  letter-spacing: var(--app-tracking-tight);
+  overflow: hidden !important;
+  height: 100dvh !important;
+}
+
+.v-main {
+  overflow-y: auto;
+  overflow-x: hidden;
+  height: 100%;
+  overscroll-behavior-y: contain;
 }
 
 h1,
@@ -75,230 +154,400 @@ h2,
 h3,
 h4,
 h5,
-h6,
-.text-h1,
-.text-h2,
-.text-h3,
-.text-h4,
-.text-h5,
-.text-h6 {
-  letter-spacing: -0.015em;
-  font-weight: 700;
+h6 {
+  letter-spacing: var(--app-tracking-tighter);
+  font-weight: 600;
+  text-wrap: balance;
+}
+
+/* Todo dato numérico se alinea en columna */
+.v-data-table,
+.app-numeric {
+  font-variant-numeric: tabular-nums;
 }
 
 /* ============================================================
-   3. Scrollbar refinado
+   3. Silencio: se desactivan los efectos de Material
    ============================================================ */
-*::-webkit-scrollbar {
+
+/* El ripple es lo que hace que cada clic se sienta con retardo */
+.v-ripple__container {
+  display: none !important;
+}
+
+/**
+ * Vuetify anima el drawer y el desplazamiento del contenido en 0.2s con una
+ * curva de aceleración. Sobre un menú que se usa decenas de veces al día eso
+ * se percibe como lentitud: aquí baja a 80ms lineales.
+ */
+.v-navigation-drawer,
+.v-navigation-drawer__content,
+.v-app-bar,
+.v-main {
+  transition-duration: var(--app-duration) !important;
+  transition-timing-function: var(--app-ease) !important;
+}
+
+/* Sin elevaciones que suban al pasar el cursor */
+.v-card,
+.v-btn {
+  transition:
+    background-color var(--app-transition),
+    border-color var(--app-transition),
+    color var(--app-transition) !important;
+}
+
+.v-btn--variant-elevated,
+.v-btn--variant-flat {
+  box-shadow: none !important;
+}
+
+/* ============================================================
+   4. Scrollbar
+   ============================================================ */
+* {
+  scrollbar-width: thin;
+}
+
+/**
+ * `scrollbar-color` es heredable: basta declararlo en los elementos que
+ * llevan la clase de tema. Con `*` cada elemento del DOM dependía de
+ * `--v-theme-on-surface`, así que al cambiar de tema se recalculaba y
+ * animaba el color de TODOS los elementos.
+ */
+[class*='v-theme--'] {
+  scrollbar-color: rgba(var(--v-theme-on-surface), 0.18) transparent;
+}
+
+/* Cambio de tema instantáneo: ver `withoutTransitions` en useAppTheme.ts */
+html.theme-switching,
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+}
+
+::-webkit-scrollbar {
   width: 10px;
   height: 10px;
 }
-*::-webkit-scrollbar-track {
+
+::-webkit-scrollbar-track {
   background: transparent;
 }
-*::-webkit-scrollbar-thumb {
-  background: rgba(100, 116, 139, 0.3);
-  border-radius: 999px;
-  border: 2px solid transparent;
+
+::-webkit-scrollbar-thumb {
+  background: rgba(var(--v-theme-on-surface), 0.16);
+  border: 3px solid transparent;
   background-clip: content-box;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: rgba(100, 116, 139, 0.55);
-  background-clip: content-box;
-}
+  border-radius: var(--app-radius-full);
 
-/* ============================================================
-   4. Ajustes globales a componentes Vuetify
-   ============================================================ */
-
-/* Cards: borde sutil + sombra suave en hover */
-.v-card {
-  transition:
-    box-shadow var(--app-transition),
-    transform var(--app-transition),
-    border-color var(--app-transition);
-}
-.v-card.app-card-hover:hover {
-  box-shadow: var(--app-shadow-lg);
-  transform: translateY(-2px);
-}
-
-/* AppBar */
-.v-app-bar {
-  border-bottom: 1px solid rgb(var(--v-theme-surface-variant)) !important;
-}
-
-/* Drawer */
-.v-navigation-drawer {
-  border-right: 1px solid rgb(var(--v-theme-surface-variant)) !important;
-}
-
-.v-navigation-drawer .v-list-item {
-  border-radius: var(--app-radius-md) !important;
-  margin: 2px 8px;
-  min-height: 42px;
-  transition:
-    background-color var(--app-transition),
-    color var(--app-transition);
-}
-
-.v-navigation-drawer .v-list-item--active {
-  background-color: rgba(var(--v-theme-primary), 0.1) !important;
-  color: rgb(var(--v-theme-primary)) !important;
-  font-weight: 600;
-}
-
-.v-navigation-drawer .v-list-item--active .v-icon {
-  color: rgb(var(--v-theme-primary)) !important;
-}
-
-/* Subheaders en drawer */
-.v-list-subheader {
-  font-size: 0.7rem !important;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  font-weight: 700 !important;
-  opacity: 0.65;
-  padding-inline-start: 16px !important;
-  min-height: 32px !important;
-}
-
-/* Data table */
-.v-data-table {
-  background: transparent !important;
-}
-.v-data-table__th {
-  font-weight: 600 !important;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  font-size: 0.72rem !important;
-  color: rgb(var(--v-theme-on-surface-variant)) !important;
-  background: rgba(var(--v-theme-surface-variant), 0.5) !important;
-}
-.v-data-table tbody tr {
-  transition: background-color var(--app-transition);
-}
-.v-data-table tbody tr:hover {
-  background-color: rgba(var(--v-theme-primary), 0.04) !important;
-}
-
-/* Inputs: foco más visible */
-.v-field--focused .v-field__outline {
-  --v-field-border-opacity: 1;
-}
-
-/* Chip: peso visual más limpio */
-.v-chip {
-  font-weight: 600;
-  letter-spacing: 0.01em;
-}
-
-/* Dialogs */
-.v-overlay__content > .v-card {
-  box-shadow: var(--app-shadow-lg) !important;
-}
-
-/* Buttons */
-.v-btn {
-  letter-spacing: 0.01em !important;
-}
-.v-btn--variant-elevated {
-  box-shadow: var(--app-shadow-sm) !important;
-}
-.v-btn--variant-elevated:hover {
-  box-shadow: var(--app-shadow-md) !important;
-}
-
-/* ============================================================
-   5. Utilidades de la app
-   ============================================================ */
-.app-page {
-  padding: var(--app-space-6);
-}
-@media (max-width: 768px) {
-  .app-page {
-    padding: var(--app-space-4);
+  &:hover {
+    background: rgba(var(--v-theme-on-surface), 0.28);
+    background-clip: content-box;
   }
 }
 
-.app-page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: var(--app-space-4);
-  margin-bottom: var(--app-space-6);
+/* ============================================================
+   5. Foco
+   ============================================================ */
+:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 1px;
+  border-radius: var(--app-radius-xs);
 }
 
-.app-page-title {
-  font-size: 1.5rem;
-  font-weight: 700;
-  letter-spacing: -0.02em;
-  margin: 0;
+.v-btn:focus-visible,
+.v-list-item:focus-visible {
+  outline-offset: -2px;
 }
 
-.app-page-subtitle {
+.app-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.app-skip-link {
+  position: fixed;
+  top: var(--app-space-2);
+  left: var(--app-space-2);
+  z-index: 3000;
+  padding: var(--app-space-2) var(--app-space-4);
+  border-radius: var(--app-radius-sm);
+  background: rgb(var(--v-theme-primary));
+  color: rgb(var(--v-theme-on-primary));
+  font-size: var(--app-text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  transform: translateY(-200%);
+
+  &:focus-visible {
+    transform: translateY(0);
+  }
+}
+
+/* ============================================================
+   6. Componentes Vuetify
+   ============================================================ */
+
+/* ── Superficies ───────────────────────────────────────── */
+.v-card {
+  border: 1px solid rgba(var(--v-border-color), 1);
+  box-shadow: none !important;
+}
+
+/* Sólo lo que flota lleva sombra */
+.v-overlay__content > .v-card,
+.v-menu > .v-overlay__content,
+.v-overlay__content > .v-list,
+.v-select__content {
+  box-shadow: var(--app-shadow-overlay) !important;
+  border: 1px solid rgba(var(--v-border-color), 1);
+}
+
+.v-card.app-card--interactive {
+  cursor: pointer;
+
+  &:hover {
+    background-color: rgba(var(--v-theme-on-surface), 0.02);
+    border-color: rgba(var(--v-theme-on-surface), 0.16);
+  }
+}
+
+/* ── Cromo ─────────────────────────────────────────────── */
+.v-app-bar {
+  border-bottom: 1px solid rgba(var(--v-border-color), 1) !important;
+}
+
+.v-navigation-drawer {
+  border-right: 1px solid rgba(var(--v-border-color), 1) !important;
+}
+
+.v-navigation-drawer .v-list-item {
+  border-radius: var(--app-radius-sm) !important;
+  margin-block: 1px;
+  margin-inline: var(--app-space-2);
+  min-height: 30px !important;
+  padding-inline: var(--app-space-2) !important;
+  font-size: var(--app-text-sm);
+}
+
+.v-navigation-drawer .v-list-item-title {
+  font-size: var(--app-text-sm) !important;
+  font-weight: 450;
+  letter-spacing: var(--app-tracking-tight);
+}
+
+.v-navigation-drawer .v-list-item:hover {
+  background: rgba(var(--v-theme-on-surface), 0.045);
+}
+
+/**
+ * El elemento activo es uno de los dos usos del acento en toda la pantalla.
+ * Se marca con fondo tenue y peso, no con un bloque de color saturado.
+ */
+.v-navigation-drawer .v-list-item--active {
+  background: rgba(var(--v-theme-on-surface), 0.06) !important;
+  color: rgb(var(--v-theme-on-surface)) !important;
+
+  .v-list-item-title {
+    font-weight: 550 !important;
+  }
+
+  .v-icon {
+    color: rgb(var(--v-theme-primary)) !important;
+    opacity: 1;
+  }
+}
+
+.v-navigation-drawer .v-list-item .v-icon {
+  opacity: 0.6;
+  font-size: 17px !important;
+}
+
+.v-list-item__prepend > .v-icon ~ .v-list-item__spacer {
+  width: var(--app-space-3) !important;
+}
+
+.v-list-subheader {
+  font-size: var(--app-text-2xs) !important;
+  text-transform: uppercase;
+  letter-spacing: var(--app-tracking-wide);
+  font-weight: 600 !important;
+  opacity: 0.5;
+  min-height: 26px !important;
+  padding-inline-start: var(--app-space-4) !important;
+}
+
+/* ── Tablas ────────────────────────────────────────────── */
+.v-data-table {
+  background: transparent !important;
+  font-size: var(--app-text-sm);
+}
+
+.v-data-table__th {
+  font-weight: 500 !important;
+  font-size: var(--app-text-2xs) !important;
+  letter-spacing: var(--app-tracking-wide);
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: rgb(var(--v-theme-on-surface-variant)) !important;
+  background: transparent !important;
+  height: 32px !important;
+  border-bottom: 1px solid rgba(var(--v-border-color), 1) !important;
+}
+
+.v-data-table__td {
+  height: var(--app-row-height) !important;
+  font-size: var(--app-text-sm);
+}
+
+/* Sin tinte de color al pasar por encima: sólo un gris apenas perceptible */
+.v-data-table tbody tr:hover {
+  background-color: rgba(var(--v-theme-on-surface), 0.025) !important;
+}
+
+.v-data-table-footer {
+  font-size: var(--app-text-xs);
+  border-top: 1px solid rgba(var(--v-border-color), 1);
+}
+
+/* ── Controles ─────────────────────────────────────────── */
+.v-field {
+  font-size: var(--app-text-sm);
+  border-radius: var(--app-radius-sm) !important;
+}
+
+.v-field__outline {
+  --v-field-border-width: 1px;
+}
+
+.v-label {
+  font-size: var(--app-text-sm) !important;
+  opacity: 1 !important;
+}
+
+input::placeholder,
+textarea::placeholder {
+  opacity: 0.45 !important;
+}
+
+/* Evita el zoom automático de iOS al enfocar un input */
+@media (max-width: 600px) {
+  .v-field input,
+  .v-field textarea {
+    font-size: 16px !important;
+  }
+}
+
+.v-btn {
+  font-size: var(--app-text-sm) !important;
+  letter-spacing: var(--app-tracking-tight) !important;
+  text-transform: none !important;
+}
+
+/* En móvil los botones necesitan altura táctil real */
+@media (max-width: 600px) {
+  .v-btn--size-default,
+  .v-btn--size-large {
+    min-height: 40px;
+  }
+}
+
+/**
+ * Los chips son etiquetas de dato, no elementos decorativos: fondo tenue del
+ * color de estado y texto legible, en vez de un bloque saturado.
+ */
+.v-chip {
+  font-size: var(--app-text-xs) !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  border-radius: var(--app-radius-xs) !important;
+}
+
+.v-chip.v-chip--size-small {
+  height: 20px;
+  padding-inline: var(--app-space-2);
+}
+
+.v-chip.v-chip--size-x-small {
+  height: 18px;
+  padding-inline: 6px;
+}
+
+/* ── Tooltips y diálogos ───────────────────────────────── */
+.v-tooltip > .v-overlay__content {
+  background: rgb(var(--v-theme-tooltip)) !important;
+  color: rgb(var(--v-theme-on-tooltip)) !important;
+  font-size: var(--app-text-xs) !important;
+  font-weight: 450 !important;
+  padding: 3px var(--app-space-2) !important;
+  border-radius: var(--app-radius-xs) !important;
+  box-shadow: none !important;
+}
+
+.v-divider {
+  border-color: rgba(var(--v-border-color), 1) !important;
+  opacity: 1;
+}
+
+/* ============================================================
+   7. Utilidades
+   ============================================================ */
+
+/** Etiqueta de sección en versalitas: sustituye a los iconos decorativos. */
+.app-eyebrow {
+  font-size: var(--app-text-2xs);
+  font-weight: 600;
+  letter-spacing: var(--app-tracking-wide);
+  text-transform: uppercase;
   color: rgb(var(--v-theme-on-surface-variant));
-  font-size: 0.9rem;
-  margin-top: 4px;
 }
 
-.app-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--app-space-4);
+/** Identificadores y valores numéricos. */
+.app-mono {
+  font-family: var(--app-font-mono);
+  font-size: 0.95em;
+  letter-spacing: 0;
 }
 
-.app-card {
-  border-radius: var(--app-radius-lg) !important;
-  border: 1px solid rgb(var(--v-theme-surface-variant)) !important;
-  background-color: rgb(var(--v-theme-surface)) !important;
-}
-
-.app-card--soft {
-  background-color: rgb(var(--v-theme-surface-variant)) !important;
-  border: 1px solid transparent !important;
+/** Rejilla auto-ajustable: reparte por ancho disponible, sin breakpoints. */
+.app-autogrid {
+  display: grid;
+  gap: var(--app-space-3);
+  grid-template-columns: repeat(
+    auto-fill,
+    minmax(min(100%, var(--app-autogrid-min, 15rem)), 1fr)
+  );
 }
 
 .app-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: var(--app-space-3);
+  gap: var(--app-space-2);
 }
 
-.app-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: var(--app-space-10) var(--app-space-6);
-  text-align: center;
-  color: rgb(var(--v-theme-on-surface-variant));
+.app-scroll-x {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
-.app-empty-state .v-icon {
-  font-size: 56px;
-  opacity: 0.4;
-  margin-bottom: var(--app-space-4);
-}
-
-/* Compactar v-container fluid en páginas */
-.v-main > .v-container--fluid:not(.pa-0) {
-  padding: var(--app-space-6);
-}
-
-/* Cursor helper */
 .cursor-pointer {
   cursor: pointer;
 }
 
-/* Transiciones de página suaves */
-.fade-enter-active,
-.fade-leave-active {
-  transition: opacity 200ms ease;
-}
-.fade-enter-from,
-.fade-leave-to {
-  opacity: 0;
+.app-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }

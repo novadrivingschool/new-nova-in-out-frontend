@@ -8,43 +8,38 @@ import type {
 } from "@/types/auth";
 
 export const usersService = {
-  async getAllUsers() {
-    try {
-      const response = await http.get<UserResponse[]>("/users");
-
-      const { data } = response;
-
-      console.log(data);
-
-      return data;
-    } catch (error) {
-      console.error("Error fetching users data", error);
-    }
+  async getAllUsers(): Promise<UserResponse[]> {
+    const { data } = await http.get<UserResponse[]>("/users");
+    return data;
   },
 
   async getFilteredUsers(queryFilter: UsersQueryFilterDto) {
-    console.log("Fetching users with query:", queryFilter);
-
     try {
+      console.log("[USERS] → POST", `${http.defaults.baseURL}/users/filter`, "payload:", JSON.parse(JSON.stringify(queryFilter)));
       const response = await http.post<UsersQueryFilterResponse>(
         "/users/filter",
         queryFilter,
       );
-
       const { data } = response;
-
-      console.log(data);
-
+      console.log("[USERS] ← status:", response.status, "| items:", data?.items?.length, "| meta:", data?.meta);
+      console.log("[USERS] ← respuesta cruda:", data);
       return {
         data: data.items,
         meta: data.meta,
       };
     } catch (error) {
-      console.error("Error fetching users data", error);
+      console.error("[USERS] ✖ falló /users/filter", {
+        status: error?.response?.status,
+        data: error?.response?.data,
+        message: error?.message,
+        code: error?.code,
+      });
+      console.error("Error fetching users:", error);
+      throw error;
     }
   },
 
-  async createUser(payload: CreateUserDto) {
+  async createUser(payload: CreateUserDto): Promise<UserResponse> {
     try {
       const { data } = await http.post<UserResponse>("/users", payload);
       return data;
@@ -53,7 +48,7 @@ export const usersService = {
     }
   },
 
-  async deleteUser(id: string) {
+  async deleteUser(id: string): Promise<void> {
     try {
       await http.delete(`/users/${id}`);
     } catch (error: any) {
@@ -61,35 +56,31 @@ export const usersService = {
     }
   },
 
-  async switchStatus(uuid: string, activate: boolean) {
+  async switchStatus(uuid: string, activate: boolean): Promise<UserResponse> {
     try {
-      const response = await http.patch(`/users/${uuid}`, {
+      const { data } = await http.patch<UserResponse>(`/users/${uuid}`, {
         isActive: activate,
       });
-      console.log(response);
+      return data;
     } catch (error: any) {
       throw error.response?.data || error;
     }
   },
 
-  async getOneUser(id: string) {
+  async getOneUser(id: string): Promise<UserResponse | undefined> {
     try {
-      const response = await http.get<UserResponse>(`/users/${id}`);
-
-      const { data } = response;
-
-      console.log(data);
-
+      const { data } = await http.get<UserResponse>(`/users/${id}`);
       return data;
     } catch (error) {
-      console.error("Error fetching user data", error);
+      console.error("Error fetching user:", error);
+      throw error;
     }
   },
 
-  async updateUser(uuid: string, payload: UpdateUserDto) {
+  async updateUser(uuid: string, payload: UpdateUserDto): Promise<UserResponse> {
     try {
-      const response = await http.patch(`/users/${uuid}`, payload);
-      console.log(response);
+      const { data } = await http.patch<UserResponse>(`/users/${uuid}`, payload);
+      return data;
     } catch (error: any) {
       throw error.response?.data || error;
     }

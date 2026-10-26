@@ -1,7 +1,8 @@
 // src/stores/auth/useAuth.ts
 import { defineStore } from "pinia";
 import { http, ensureFreshAccessToken } from "@/lib/http";
-import type { AuthResponseDto, LoginRequest, UserDto } from "@/types/auth";
+import type { AuthResponseDto, LoginWebRequest, UserDto } from "@/types/auth";
+import router from "@/router";
 
 const LS_ACCESS_KEY = "novaio_accessToken";
 const LS_REFRESH_KEY = "novaio_refreshToken";
@@ -44,11 +45,13 @@ export const useAuth = defineStore("auth", {
         }
       });
 
-      // refresh falló (401, etc.)
+      // refresh falló (401, etc.) → limpiar sesión y redirigir al login
       window.addEventListener("auth:refresh-failed", (ev: any) => {
         const d = ev?.detail;
         slog("event auth:refresh-failed", d);
         this.error = d?.msg || "Refresh falló";
+        this._clearClientSide();
+        router.replace("/");
       });
 
       // sync multi-tab
@@ -100,13 +103,21 @@ export const useAuth = defineStore("auth", {
       } catch {}
     },
 
-    async login(email: string, password: string) {
+    /**
+     * Login del front web: identifica por employee_number contra el endpoint
+     * dedicado `/auth/login/web`. `/auth/login` queda reservado para Electron.
+     */
+    async login(employeeNumber: string, password: string) {
       this.loading = true;
       this.error = null;
-      slog("login START", { email });
+      const normalized = employeeNumber.trim().toUpperCase();
+      slog("login START", { employeeNumber: normalized });
       try {
-        const body: LoginRequest = { email, password };
-        const { data } = await http.post<AuthResponseDto>("/auth/login", body);
+        const body: LoginWebRequest = { employeeNumber: normalized, password };
+        const { data } = await http.post<AuthResponseDto>(
+          "/auth/login/web",
+          body,
+        );
         this.setUser(data.user);
         this.setTokens(data.tokens.accessToken, data.tokens.refreshToken);
         slog("login END OK");

@@ -15,13 +15,10 @@ import { createApp } from 'vue'
 
 // Styles
 import 'unfonts.css'
-import { useAuth } from '@/stores/auth/useAuth'
 
 const app = createApp(App)
 
 registerPlugins(app)
 
-// rehidrata sesión
-//useAuth().hydrateMe()
-
+// El tema y la sesión se inicializan en App.vue, dentro del scope de setup.
 app.mount('#app')

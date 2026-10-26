@@ -1,450 +1,733 @@
+<!--
+  src/components/Users/UserInformation.vue
+
+  Ficha de usuario con modo lectura y modo edición.
+
+  En lectura los datos se pintan como una rejilla etiqueta/valor que colapsa a
+  una columna en móvil; en edición los mismos campos se convierten en inputs
+  sin cambiar la estructura, para que no haya salto visual al alternar.
+-->
 <template>
-  <v-card variant="flat" class="pa-4">
-    <div
-      class="d-flex align-center ga-8 mb-8 justify-space-between"
-      :class="smAndDown ? 'flex-column' : ''"
-    >
-      <div class="d-flex align-center ga-5">
-        <div>
-          <div class="d-flex ga-2" :class="xs ? 'flex-column' : ''">
-            <h2 class="text-h6 font-weight-bold">
-              {{
-                isEditing
-                  ? "Edit Profile"
-                  : `${props.user.profile?.firstName || ""} ${props.user.profile?.lastName || ""}`
-              }}
-            </h2>
-            <v-chip
-              v-if="!xs"
-              :color="props.user.isActive ? 'success' : 'error'"
-            >
-              {{ props.user.isActive ? "Active" : "Inactive" }}
-            </v-chip>
-          </div>
+  <div class="user-info">
+    <!-- ═══ Cabecera ═══ -->
+    <!--
+      Sin avatar grande de color ni chips de rol repetidos: el nombre, el
+      identificador y el estado bastan. El estado se marca con un punto, no con
+      un bloque de color que compita con el resto de la ficha.
+    -->
+    <div class="user-info__header">
+      <div class="user-info__identity">
+        <h2 class="user-info__name">{{ isEditing ? 'Edit profile' : fullName }}</h2>
 
-          <p class="text-subtitle-2 text-medium-emphasis mb-2">
-            {{ props.user.email }}
-          </p>
-
-          <v-chip v-if="xs" :color="props.user.isActive ? 'success' : 'error'">
-            {{ props.user.isActive ? "Active" : "Inactive" }}
-          </v-chip>
+        <div class="user-info__meta">
+          <span v-if="user.profile?.employee_number" class="app-mono">
+            {{ user.profile.employee_number }}
+          </span>
+          <span v-if="user.email" class="user-info__email">{{ user.email }}</span>
+          <span class="user-info__status">
+            <span
+              class="user-info__dot"
+              :class="user.isActive ? 'user-info__dot--on' : 'user-info__dot--off'"
+            />
+            {{ user.isActive ? 'Active' : 'Inactive' }}
+          </span>
         </div>
       </div>
 
       <v-btn
-        :icon="isEditing ? 'mdi-close' : 'mdi-pencil'"
-        :color="isEditing ? 'grey' : 'primary'"
-        variant="tonal"
+        variant="outlined"
+        size="small"
+        class="user-info__edit-btn"
         @click="toggleEdit"
-      />
+      >
+        {{ isEditing ? 'Cancel' : 'Edit' }}
+      </v-btn>
     </div>
 
-    <v-form ref="formRef" v-model="isFormValid">
-      <p class="font-weight-medium text-h6">Basic Information</p>
-      <v-divider color="grey my-4"></v-divider>
+    <v-form ref="formRef" v-model="isFormValid" @submit.prevent="saveChanges">
+      <!-- ═══ Información básica ═══ -->
+      <v-card class="mb-4">
+        <div class="user-info__section-head">
+          <span class="app-eyebrow">Basic information</span>
+        </div>
+        <v-divider />
 
-      <div class="d-flex ga-2 mb-8">
-        <!-- <v-label class="mb-1 font-weight-medium">Employee Number</v-label> -->
-        <p
-          v-if="props.user.profile?.employee_number"
-          class="font-weight-bold text-grey"
-        >
-          {{ props.user.profile?.employee_number }}
-        </p>
-        <template v-for="role in props.user.roles" :key="props.user.id">
-          <v-chip class="text-capitalize" color="primary" variant="tonal">
-            {{ role }}
-          </v-chip>
-        </template>
-      </div>
-      <v-row>
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">First Name</v-label>
-          <v-text-field
-            v-if="isEditing"
-            v-model="formData.profile.firstName"
-            variant="outlined"
-            density="compact"
-            :rules="[rules.required]"
-          />
-          <p v-else class="text-body-1 py-2">
-            {{ props.user.profile?.firstName }}
-          </p>
-        </v-col>
-
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Last Name</v-label>
-          <v-text-field
-            v-if="isEditing"
-            v-model="formData.profile.lastName"
-            variant="outlined"
-            density="compact"
-            :rules="[rules.required]"
-          />
-          <p v-else class="text-body-1 py-2">
-            {{ props.user.profile?.lastName }}
-          </p>
-        </v-col>
-
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Phone Number</v-label>
-          <v-text-field
-            v-if="isEditing"
-            v-model="formData.profile.phone"
-            variant="outlined"
-            density="compact"
-            :rules="[rules.phoneMax, rules.phonePattern]"
-          />
-          <p v-else class="text-body-1 py-2">{{ props.user.profile?.phone }}</p>
-        </v-col>
-
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Birthdate</v-label>
-          <template v-if="isEditing">
-            <v-menu
-              v-model="menuDate"
-              :close-on-content-click="false"
-              transition="scale-transition"
-              min-width="auto"
-            >
-              <template v-slot:activator="{ props }">
-                <v-text-field
-                  v-bind="props"
-                  v-model="formData.profile.birthdate"
-                  variant="outlined"
-                  density="compact"
-                  append-inner-icon="mdi-calendar"
-                  readonly
-                />
-              </template>
-              <v-date-picker
-                v-model="datePickerValue"
-                @update:model-value="onDateSelected"
-                color="primary"
+        <div class="user-info__section-body">
+          <v-row>
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">First name</v-label>
+              <v-text-field
+                v-if="isEditing"
+                v-model="formData.profile.firstName"
+                :rules="[rules.required]"
+                :density="density"
+                autocomplete="given-name"
+                @update:model-value="recalcUsername"
               />
-            </v-menu>
-          </template>
-          <p v-else class="text-body-1 py-2">
-            {{ props.user.profile?.birthdate }}
-          </p>
-        </v-col>
+              <p v-else class="user-info__value">
+                {{ display(user.profile?.firstName) }}
+              </p>
+            </v-col>
 
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Gender</v-label>
-          <v-select
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">Last name</v-label>
+              <v-text-field
+                v-if="isEditing"
+                v-model="formData.profile.lastName"
+                :rules="[rules.required]"
+                :density="density"
+                autocomplete="family-name"
+                @update:model-value="recalcUsername"
+              />
+              <p v-else class="user-info__value">
+                {{ display(user.profile?.lastName) }}
+              </p>
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">Phone number</v-label>
+              <v-text-field
+                v-if="isEditing"
+                v-model="formData.profile.phone"
+                :rules="[rules.phoneMax, rules.phonePattern]"
+                :density="density"
+                maxlength="16"
+                inputmode="tel"
+              />
+              <p v-else class="user-info__value">
+                {{ display(user.profile?.phone) }}
+              </p>
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">Birthdate</v-label>
+              <v-menu
+                v-if="isEditing"
+                v-model="menuDate"
+                :close-on-content-click="false"
+                transition="scale-transition"
+              >
+                <template #activator="{ props: menuProps }">
+                  <v-text-field
+                    v-bind="menuProps"
+                    v-model="formData.profile.birthdate"
+                    :density="density"
+                    append-inner-icon="mdi-calendar"
+                    placeholder="YYYY-MM-DD"
+                    readonly
+                  />
+                </template>
+                <v-date-picker
+                  v-model="datePickerValue"
+                  color="primary"
+                  @update:model-value="onDateSelected"
+                />
+              </v-menu>
+              <p v-else class="user-info__value">
+                {{ display(user.profile?.birthdate) }}
+              </p>
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">Gender</v-label>
+              <!--
+                Sin `v-model`: al limpiarlo, `v-select` emite `null`, y el DTO
+                del perfil usa `undefined` para "sin valor". Se normaliza aquí.
+              -->
+              <v-select
+                v-if="isEditing"
+                :model-value="formData.profile.gender ?? null"
+                :items="genderOptions"
+                :density="density"
+                clearable
+                @update:model-value="formData.profile.gender = $event ?? undefined"
+              />
+              <p v-else class="user-info__value">
+                {{ display(user.profile?.gender) }}
+              </p>
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">Employee number</v-label>
+              <p class="user-info__value user-info__value--mono">
+                {{ display(user.profile?.employee_number) }}
+                <v-tooltip
+                  v-if="isEditing"
+                  text="Generated by the server and used to sign in. Not editable."
+                  location="top"
+                >
+                  <template #activator="{ props: tip }">
+                    <v-icon v-bind="tip" size="16" class="ms-1 text-medium-emphasis">
+                      mdi-lock-outline
+                    </v-icon>
+                  </template>
+                </v-tooltip>
+              </p>
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">External employee number</v-label>
+              <v-text-field
+                v-if="isEditing"
+                v-model="formData.profile.external_employee_number"
+                :rules="[rules.externalEmployeeNumber]"
+                :density="density"
+                maxlength="50"
+                autocomplete="off"
+                spellcheck="false"
+                hint="From the external HR app. Optional."
+                persistent-hint
+              />
+              <p v-else class="user-info__value user-info__value--mono">
+                {{ display(user.profile?.external_employee_number) }}
+              </p>
+            </v-col>
+          </v-row>
+        </div>
+      </v-card>
+
+      <!-- ═══ NIO + Activity Report ═══ -->
+      <v-card class="mb-4">
+        <div class="user-info__section-head">
+          <span class="app-eyebrow">NIO / Activity Report clock</span>
+        </div>
+        <v-divider />
+        <div class="user-info__section-body">
+          <v-switch
             v-if="isEditing"
-            :items="Object.values(Gender)"
-            v-model="formData.profile.gender as Gender"
-            variant="outlined"
-            density="compact"
-            hide-details
+            v-model="formData.profile.activity_linked"
+            label="Link NIO + Activity Report (AR): clock only from the AR, with the NIO app open"
+            color="primary"
+            inset
+            hide-details="auto"
           />
-          <p v-else class="text-body-1 py-2">
-            {{ props.user.profile?.gender }}
+          <p v-else class="user-info__value">
+            <v-chip size="small" variant="tonal" :color="user.profile?.activity_linked ? 'primary' : undefined">
+              {{ user.profile?.activity_linked ? 'NIO + AR (linked)' : 'NIO | AR (independent)' }}
+            </v-chip>
           </p>
-        </v-col>
-      </v-row>
-
-      <div class="d-flex justify-space-between align-center mt-4">
-        <p class="font-weight-medium text-h6">Authentication</p>
-        <v-btn
-          v-if="!isEditing"
-          icon
-          variant="tonal"
-          color="primary"
-          @click="handleResetPassword"
-        >
-          <v-icon>mdi-lock-reset</v-icon>
-
-          <v-tooltip activator="parent" location="top" color="primary">
-            Reset Password
-          </v-tooltip>
-        </v-btn>
-      </div>
-      <v-divider color="grey my-4"></v-divider>
-
-      <v-row>
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">Email Address</v-label>
-          <v-text-field
-            v-if="isEditing"
-            v-model="formData.email"
-            variant="outlined"
-            density="compact"
-            :rules="[rules.email]"
-          />
-          <p v-else class="text-body-1 py-2">{{ props.user.email }}</p>
-        </v-col>
-
-        <v-col cols="12" sm="6">
-          <v-label class="mb-1 font-weight-medium">User Name</v-label>
-          <v-text-field
-            v-if="isEditing"
-            v-model="formData.profile.userName"
-            variant="outlined"
-            density="compact"
-          />
-          <p v-else class="text-body-1 py-2">
-            {{ props.user.profile.userName }}
+          <p class="text-caption text-medium-emphasis mt-2 mb-0">
+            When linked, the clock button of the NIO desktop app is disabled, and the Activity Report (AR) can only
+            Clock In / Clock Out while the user's NIO app is active.
           </p>
-        </v-col>
-      </v-row>
+        </div>
+      </v-card>
+
+      <!-- ═══ Acceso ═══ -->
+      <v-card class="mb-4">
+        <div class="user-info__section-head">
+          <span class="app-eyebrow">Access</span>
+        </div>
+        <v-divider />
+
+        <div class="user-info__section-body">
+          <v-row>
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">Email address</v-label>
+              <v-text-field
+                v-if="isEditing"
+                v-model="formData.email"
+                :rules="[rules.email]"
+                :density="density"
+                type="email"
+                autocomplete="email"
+              />
+              <p v-else class="user-info__value">{{ display(user.email) }}</p>
+            </v-col>
+
+            <v-col v-bind="fieldCols">
+              <v-label class="user-info__label">Username</v-label>
+              <v-text-field
+                v-if="isEditing"
+                v-model="formData.profile.userName"
+                :rules="[rules.userNameMax]"
+                :density="density"
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck="false"
+                @update:model-value="usernameTouched = true"
+              />
+              <p v-else class="user-info__value">
+                {{ display(user.profile?.userName) }}
+              </p>
+            </v-col>
+
+            <v-col v-bind="fieldColsWide">
+              <v-label class="user-info__label">Roles</v-label>
+              <v-select
+                v-if="isEditing"
+                v-model="formData.roles"
+                :items="roleOptions"
+                :rules="[rules.rolesRequired]"
+                :density="density"
+                multiple
+                chips
+                closable-chips
+              />
+              <div v-else class="user-info__value d-flex flex-wrap ga-1">
+                <v-chip
+                  v-for="role in user.roles"
+                  :key="role"
+                  size="small"
+                  variant="tonal"
+                  color="primary"
+                  class="text-capitalize"
+                >
+                  {{ role.replace(/_/g, ' ') }}
+                </v-chip>
+                <span v-if="!user.roles?.length">—</span>
+              </div>
+            </v-col>
+
+            <v-col v-if="isEditing" cols="12">
+              <v-switch
+                v-model="formData.isActive"
+                color="primary"
+                :label="formData.isActive
+                  ? 'Active — the user can sign in'
+                  : 'Inactive — the user cannot sign in'"
+              />
+            </v-col>
+
+            <!-- Cambio de contraseña, sólo en edición -->
+            <template v-if="isEditing">
+              <v-col cols="12">
+                <v-divider class="mb-4" />
+                <v-label class="user-info__label">
+                  New password
+                  <span class="text-caption ms-1 text-medium-emphasis">
+                    (leave blank to keep the current one)
+                  </span>
+                </v-label>
+              </v-col>
+
+              <v-col v-bind="fieldCols">
+                <v-text-field
+                  v-model="newPassword"
+                  :type="showNewPassword ? 'text' : 'password'"
+                  :rules="newPassword ? [rules.passwordMin] : []"
+                  :density="density"
+                  placeholder="Min 8 characters"
+                  autocomplete="new-password"
+                  :append-inner-icon="showNewPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                  @click:append-inner="showNewPassword = !showNewPassword"
+                />
+              </v-col>
+
+              <v-col v-bind="fieldCols">
+                <v-text-field
+                  v-model="confirmNewPassword"
+                  :type="showConfirmPassword ? 'text' : 'password'"
+                  :rules="newPassword ? [rules.newPasswordMatch] : []"
+                  :density="density"
+                  placeholder="Repeat new password"
+                  autocomplete="new-password"
+                  :append-inner-icon="showConfirmPassword ? 'mdi-eye-off' : 'mdi-eye'"
+                  @click:append-inner="showConfirmPassword = !showConfirmPassword"
+                />
+              </v-col>
+            </template>
+          </v-row>
+        </div>
+      </v-card>
+
+      <v-expand-transition>
+        <div v-if="isEditing" class="user-info__actions">
+          <v-btn variant="text" :size="btnSize" :disabled="loading" @click="cancelEdit">
+            Cancel
+          </v-btn>
+          <v-btn
+            type="submit"
+            color="primary"
+            variant="flat"
+            :size="btnSize"
+            :loading="loading"
+            :disabled="!isFormValid"
+          >
+            Save changes
+          </v-btn>
+        </div>
+      </v-expand-transition>
     </v-form>
 
-    <v-expand-transition>
-      <div v-if="isEditing" class="d-flex justify-end ga-2 mt-6">
-        <v-btn variant="text" @click="cancelEdit">Cancel</v-btn>
-        <v-btn
-          color="primary"
-          @click="saveChanges"
-          :loading="loading"
-          :disabled="!isFormValid"
-        >
-          Save Changes
-        </v-btn>
-      </div>
-    </v-expand-transition>
-  </v-card>
-
-  <v-snackbar
-    v-model="snackbar.show"
-    :color="snackbar.color"
-    :timeout="3000"
-    location="top right"
-  >
-    {{ snackbar.text }}
-
-    <template v-slot:actions>
-      <v-btn variant="text" @click="snackbar.show = false"> Close </v-btn>
-    </template>
-  </v-snackbar>
-
-  <base-dialog
-    :title="dialogConfig.title"
-    :show="showDialog"
-    :icon="dialogConfig.icon"
-    :loading="dialogLoading"
-    @close="showDialog = !showDialog"
-  >
-    <template #dialog-body>
-      <v-form ref="resetPasswordForm" v-model="isResetPasswordFormValid">
-        <div class="mb-5">
-          <v-label class="mb-1 font-weight-medium">New Password</v-label>
-          <v-text-field
-            v-model="password"
-            :rules="[rules.required, rules.passwordMin]"
-            variant="outlined"
-            density="compact"
-            type="password"
-            placeholder="********"
-          />
-        </div>
-
-        <v-label class="mb-1 font-weight-medium">Confirm Password</v-label>
-        <v-text-field
-          v-model="confirmPassword"
-          :rules="[rules.required, rules.passwordMatch, rules.passwordMin]"
-          variant="outlined"
-          density="compact"
-          type="password"
-          placeholder="********"
-        />
-      </v-form>
-    </template>
-    <template #dialog-actions>
-      <v-btn
-        v-for="action in dialogConfig.actions"
-        :key="action.label"
-        variant="elevated"
-        :color="action.btnColor"
-        @click="action.onClick"
-        :disabled="!isResetPasswordFormValid"
-        >{{ action.label }}</v-btn
-      >
-    </template>
-  </base-dialog>
+    <v-snackbar v-model="snackbar.show" :color="snackbar.color">
+      {{ snackbar.text }}
+      <template #actions>
+        <v-btn variant="text" @click="snackbar.show = false">Close</v-btn>
+      </template>
+    </v-snackbar>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from "vue";
-import { Gender, type UserResponse } from "@/types/auth";
-import { useDisplay } from "vuetify/lib/composables/display.mjs";
-import { usersService } from "@/services/users.service";
-import { formatRange } from "@fullcalendar/core/index.js";
-import BaseDialog from "../common/BaseDialog.vue";
-import type { DialogConfig } from "@/types/ui/base-dialog";
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import {
+  Gender,
+  Role,
+  type UpdateUserDto,
+  type UpdateUserProfileDto,
+  type UserResponse,
+} from '@/types/auth'
+import { usersService } from '@/services/users.service'
+import { useResponsive } from '@/composables/useResponsive'
 
-const { smAndDown, mobile, xs } = useDisplay();
+const props = defineProps<{ user: UserResponse; autoEdit?: boolean }>()
+const emit = defineEmits<{ (e: 'updated', user: UserResponse): void }>()
 
-const props = defineProps<{ user: UserResponse }>();
-const emit = defineEmits(["updated"]);
+const { density, btnSize, fieldCols, fieldColsWide } = useResponsive()
 
-const menuDate = ref(false);
-const datePickerValue = ref(null);
-const isFormValid = ref(false);
-const showDialog = ref(false);
-const password = ref<string>();
-const confirmPassword = ref<string>();
-const isResetPasswordFormValid = ref(false);
+const formRef = ref<any>(null)
+const isFormValid = ref(false)
+const isEditing = ref(false)
+const loading = ref(false)
+const menuDate = ref(false)
+const datePickerValue = ref(null)
 
-const dialogConfig = reactive<DialogConfig>({
-  title: "",
-  description: "",
-  icon: "",
-  actions: [],
-});
+const newPassword = ref('')
+const confirmNewPassword = ref('')
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
 
-const snackbar = reactive({
-  show: false,
-  text: "",
-  color: "success",
-});
+/**
+ * Marca si el usuario ha tocado el campo de username. La versión anterior lo
+ * regeneraba en cada pulsación sobre el nombre, pisando cualquier valor manual.
+ */
+const usernameTouched = ref(false)
 
-const rules = {
-  required: (v: any) => !!v || "This field is required",
-  phoneMax: (v: string) => v?.length <= 16 || "Max 16 characters",
-  phonePattern: (v: string) =>
-    /^[+0-9]*$/.test(v) || "Only numbers and + allowed",
-  email: (v: string) => !v || /.+@.+\..+/.test(v) || "E-mail must be valid",
-  passwordMatch: (v: string) =>
-    v === password.value || "Passwords do not match",
-  passwordMin: (v: string) => (v && v.length >= 8) || "Min 8 characters",
-};
+const snackbar = reactive({ show: false, text: '', color: 'success' })
 
-const isEditing = ref(false);
-const formRef = ref<any>(null);
-const loading = ref(false);
-const dialogLoading = ref(false);
+const genderOptions: string[] = Object.values(Gender)
+const roleOptions = Object.values(Role).map((role) => ({
+  title: role.replace(/_/g, ' '),
+  value: role,
+}))
 
-const onDateSelected = (val: Date | null) => {
-  if (val) {
-    // Formateamos la fecha a YYYY-MM-DD para el input
-    formData.profile.birthdate = new Date(val).toISOString().split("T")[0];
-    menuDate.value = false; // Cerramos el menú
+/** Copia editable e independiente del usuario recibido. */
+function snapshot(user: UserResponse) {
+  return {
+    email: user.email ?? '',
+    roles: [...(user.roles ?? [])],
+    isActive: user.isActive,
+    profile: {
+      firstName: user.profile?.firstName ?? '',
+      lastName: user.profile?.lastName ?? '',
+      phone: user.profile?.phone ?? '',
+      birthdate: user.profile?.birthdate ?? '',
+      gender: user.profile?.gender ?? undefined,
+      userName: user.profile?.userName ?? '',
+      avatarUrl: user.profile?.avatarUrl ?? '',
+      external_employee_number: user.profile?.external_employee_number ?? '',
+      activity_linked: user.profile?.activity_linked ?? false,
+    } as UpdateUserProfileDto,
   }
-};
+}
 
-const formData: UserResponse = reactive(JSON.parse(JSON.stringify(props.user)));
+const formData = reactive(snapshot(props.user))
 
 watch(
   () => props.user,
-  (newVal) => {
-    if (newVal) {
-      Object.assign(formData, JSON.parse(JSON.stringify(newVal)));
-    }
+  (value) => {
+    if (!value || isEditing.value) return
+    Object.assign(formData, snapshot(value))
   },
   { deep: true },
-);
+)
 
-const toggleEdit = () => {
-  isEditing.value = !isEditing.value;
-};
+onMounted(async () => {
+  if (!props.autoEdit) return
+  isEditing.value = true
+  await nextTick()
+  formRef.value?.validate()
+})
 
-const cancelEdit = () => {
-  // Resetear los cambios si cancela
-  Object.assign(formData, JSON.parse(JSON.stringify(props.user)));
-  isEditing.value = false;
-};
+const fullName = computed(() => {
+  const name = [props.user.profile?.firstName, props.user.profile?.lastName]
+    .filter(Boolean)
+    .join(' ')
+    .trim()
+  return name || props.user.profile?.employee_number || props.user.email || 'User'
+})
 
-const resetPassword = async () => {
-  dialogLoading.value = true;
-  try {
-    const updatedUser = await usersService.updateUser(props.user.id, {
-      password: password.value,
-    });
+const initials = computed(() => {
+  const first = props.user.profile?.firstName?.trim()?.[0]
+  const last = props.user.profile?.lastName?.trim()?.[0]
+  if (first || last) return `${first ?? ''}${last ?? ''}`.toUpperCase()
+  return fullName.value[0]?.toUpperCase() ?? 'U'
+})
 
-    snackbar.text = "Password Updated successfully!";
-    snackbar.color = "success";
-    snackbar.show = true;
+/** Evita que la ficha muestre huecos en blanco para campos sin valor. */
+function display(value: unknown): string {
+  if (value === null || value === undefined || value === '') return '—'
+  return String(value)
+}
 
-    showDialog.value = false;
+const rules = {
+  required: (v: unknown) => !!v || 'This field is required',
+  phoneMax: (v: string) => !v || v.length <= 16 || 'Max 16 characters',
+  phonePattern: (v: string) =>
+    !v || /^[+0-9]*$/.test(v) || 'Only numbers and + allowed',
+  email: (v: string) => !v || /.+@.+\..+/.test(v) || 'E-mail must be valid',
+  userNameMax: (v: string) => !v || v.length <= 200 || 'Max 200 characters',
+  passwordMin: (v: string) => (!!v && v.length >= 8) || 'Min 8 characters',
+  newPasswordMatch: (v: string) =>
+    v === newPassword.value || 'Passwords do not match',
+  rolesRequired: (v: Role[]) => (!!v && v.length > 0) || 'Pick at least one role',
+  externalEmployeeNumber: (v?: string | null) =>
+    !v || v.trim().length <= 50 || 'Max 50 characters',
+}
 
-    password.value = "";
-    confirmPassword.value = "";
-  } catch (error: any) {
-    const errorMsg = Array.isArray(error.message)
-      ? error.message[0]
-      : error.message;
+watch(newPassword, () => {
+  if (confirmNewPassword.value) formRef.value?.validate()
+})
 
-    snackbar.text = errorMsg || "An unexpected error occurred";
-    snackbar.color = "error";
-    snackbar.show = true;
-  } finally {
-    dialogLoading.value = false;
+function buildUsername(firstName: string, lastName: string): string {
+  const first = firstName.trim().split(/\s+/)[0]?.toLowerCase() ?? ''
+  const initial = lastName.trim()[0]?.toUpperCase() ?? ''
+  return `${first}${initial}`
+}
+
+function recalcUsername(): void {
+  if (usernameTouched.value) return
+  const first = formData.profile.firstName ?? ''
+  const last = formData.profile.lastName ?? ''
+  if (first || last) formData.profile.userName = buildUsername(first, last)
+}
+
+function onDateSelected(value: unknown): void {
+  if (!value) return
+  const date = new Date(value as string)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  formData.profile.birthdate = `${year}-${month}-${day}`
+  menuDate.value = false
+}
+
+async function toggleEdit(): Promise<void> {
+  if (isEditing.value) {
+    cancelEdit()
+    return
   }
-};
+  isEditing.value = true
+  await nextTick()
+  formRef.value?.validate()
+}
 
-const handleResetPassword = () => {
-  showDialog.value = true;
-  dialogConfig.title = "Reset Password";
-  dialogConfig.icon = "mdi-lock-reset";
-  dialogConfig.actions = [
-    {
-      btnColor: "primary",
-      label: "Confirm",
-      onClick: () => resetPassword(),
-    },
-  ];
-};
+function cancelEdit(): void {
+  Object.assign(formData, snapshot(props.user))
+  newPassword.value = ''
+  confirmNewPassword.value = ''
+  usernameTouched.value = false
+  isEditing.value = false
+}
 
-const saveChanges = async () => {
-  loading.value = true;
-  try {
-    console.log("Guardando:", formData);
+function notify(text: string, color: 'success' | 'error' = 'success'): void {
+  snackbar.text = text
+  snackbar.color = color
+  snackbar.show = true
+}
 
-    const payload: Partial<UserResponse> = {};
+/** Compone un PATCH sólo con lo que realmente cambió. */
+function buildPayload(): UpdateUserDto {
+  const payload: UpdateUserDto = {}
+  const original = props.user
 
-    // Comprobar campos del primer nivel (ej. email)
-    if (formData.email !== props.user.email) {
-      payload.email = formData.email;
-    }
-
-    // Comprobar campos dentro del profile
-    const profileChanges: any = {};
-    const originalProfile = props.user.profile || {};
-    const currentProfile = formData.profile || {};
-
-    // Iteramos sobre las llaves del perfil actual para ver qué cambió
-    Object.keys(currentProfile).forEach((key) => {
-      const k = key as keyof typeof currentProfile;
-      if (currentProfile[k] !== originalProfile[k]) {
-        profileChanges[k] = currentProfile[k];
-      }
-    });
-
-    // Si hubo cambios en el perfil, lo agregamos al payload
-    if (Object.keys(profileChanges).length > 0) {
-      payload.profile = profileChanges;
-    }
-
-    // 3. Si no hay cambios, simplemente cerramos la edición
-    if (Object.keys(payload).length === 0) {
-      isEditing.value = false;
-      return;
-    }
-
-    console.log("PAYLOAD TO UPDATE", payload);
-
-    const updatedUser = await usersService.updateUser(props.user.id, payload);
-
-    snackbar.text = "Profile updated successfully!";
-    snackbar.color = "success";
-    snackbar.show = true;
-    isEditing.value = false;
-    setTimeout(() => {
-      isEditing.value = false;
-      emit("updated", updatedUser);
-    }, 500);
-  } catch (error: any) {
-    const errorMsg = Array.isArray(error.message)
-      ? error.message[0]
-      : error.message;
-    snackbar.text = errorMsg || "Error updating profile";
-    snackbar.color = "error";
-    snackbar.show = true;
-  } finally {
-    loading.value = false;
+  if (formData.email !== (original.email ?? '')) {
+    payload.email = formData.email || undefined
   }
-};
+
+  if (formData.isActive !== original.isActive) {
+    payload.isActive = formData.isActive
+  }
+
+  const rolesChanged =
+    formData.roles.length !== (original.roles?.length ?? 0) ||
+    formData.roles.some((role) => !original.roles?.includes(role))
+  if (rolesChanged) payload.roles = [...formData.roles]
+
+  const profileChanges: UpdateUserProfileDto = {}
+  const originalProfile = original.profile ?? ({} as UserResponse['profile'])
+
+  for (const key of Object.keys(formData.profile) as Array<
+    keyof UpdateUserProfileDto
+  >) {
+    const next = formData.profile[key] ?? ''
+    const prev = (originalProfile as any)?.[key] ?? ''
+    if (next !== prev) (profileChanges as any)[key] = formData.profile[key]
+  }
+
+  if (Object.keys(profileChanges).length > 0) payload.profile = profileChanges
+
+  if (newPassword.value && newPassword.value === confirmNewPassword.value) {
+    payload.password = newPassword.value
+  }
+
+  // Sin employee_number, un PATCH vacío basta para que el backend lo genere.
+  if (!original.profile?.employee_number && Object.keys(payload).length === 0) {
+    payload.profile = {}
+  }
+
+  return payload
+}
+
+async function saveChanges(): Promise<void> {
+  const { valid } = await formRef.value.validate()
+  if (!valid) return
+
+  const payload = buildPayload()
+
+  if (Object.keys(payload).length === 0) {
+    isEditing.value = false
+    notify('No changes to save.')
+    return
+  }
+
+  loading.value = true
+  try {
+    const updated = await usersService.updateUser(props.user.id, payload)
+    newPassword.value = ''
+    confirmNewPassword.value = ''
+    usernameTouched.value = false
+    isEditing.value = false
+    notify('Profile updated successfully.')
+    emit('updated', updated)
+  } catch (error: any) {
+    const message = Array.isArray(error?.message)
+      ? error.message[0]
+      : error?.message
+    notify(message || 'Error updating profile', 'error')
+  } finally {
+    loading.value = false
+  }
+}
 </script>
+
+<style scoped>
+.user-info__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--app-space-4);
+  padding-bottom: var(--app-space-4);
+  margin-bottom: var(--app-space-4);
+  border-bottom: 1px solid rgba(var(--v-border-color), 1);
+}
+
+.user-info__identity {
+  min-width: 0;
+}
+
+.user-info__name {
+  font-size: var(--app-text-lg);
+  font-weight: 600;
+  letter-spacing: var(--app-tracking-tighter);
+  line-height: 1.25;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.user-info__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--app-space-1) var(--app-space-4);
+  margin-top: var(--app-space-2);
+  font-size: var(--app-text-sm);
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.user-info__email {
+  overflow-wrap: anywhere;
+}
+
+.user-info__status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.user-info__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+}
+
+.user-info__dot--on {
+  background: rgb(var(--v-theme-success));
+}
+
+.user-info__dot--off {
+  background: rgb(var(--v-theme-error));
+}
+
+.user-info__edit-btn {
+  flex-shrink: 0;
+}
+
+.user-info__section-head {
+  padding: var(--app-space-3) var(--app-space-4);
+}
+
+.user-info__section-body {
+  padding: var(--app-space-4);
+}
+
+.user-info__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--app-text-xs);
+  font-weight: 500;
+  color: rgb(var(--v-theme-on-surface-variant));
+  opacity: 1;
+}
+
+/**
+ * La altura mínima iguala la de un input `comfortable`, de forma que alternar
+ * entre lectura y edición no desplaza el resto del formulario.
+ */
+.user-info__value {
+  display: flex;
+  align-items: center;
+  min-height: 2.25rem;
+  margin: 0;
+  font-size: var(--app-text-md);
+  overflow-wrap: anywhere;
+}
+
+.user-info__value--mono {
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+
+.user-info__actions {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+}
+
+@media (max-width: 600px) {
+  .user-info__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .user-info__identity {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .user-info__edit-btn {
+    align-self: flex-end;
+  }
+
+  .user-info__section-body {
+    padding: var(--app-space-4);
+  }
+
+  .user-info__actions > * {
+    flex: 1 1 auto;
+  }
+}
+</style>

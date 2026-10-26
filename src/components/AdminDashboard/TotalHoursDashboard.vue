@@ -1,165 +1,294 @@
+<!--
+  src/components/AdminDashboard/TotalHoursDashboard.vue
+
+  Gráfico de horas trabajadas con selector de rango.
+
+  Los atajos ("Last 7 days", "This month"…) evitan que el caso común exija
+  abrir dos calendarios. El rango manual sigue disponible.
+-->
 <template>
-  <div class="d-flex align-center justify-space-between flex-wrap">
-    <div class="mb-4">
-      <h1 class="app-page-title">Total Hours</h1>
-      <p class="app-page-subtitle">
-        {{ dateRangeLabel }}
-      </p>
-    </div>
+  <v-card>
+    <div class="hours__head">
+      <div>
+        <h2 class="hours__title">Total hours</h2>
+        <p class="hours__subtitle">{{ dateRangeLabel }}</p>
+      </div>
 
-    <div class="app-toolbar mb-4" :class="xs ? 'w-100 d-flex flex-column' : ''">
-      <v-menu v-model="startMenu" :close-on-content-click="false">
-        <template v-slot:activator="{ props }">
-          <v-text-field
-            v-bind="props"
-            :model-value="formatDisplayDate(rawStartDate)"
-            label="Start Date"
-            readonly
-            prepend-inner-icon="mdi-calendar-start"
-            density="compact"
-            variant="outlined"
-            hide-details
-            :style="xs ? 'width: 100%' : 'width: 160px'"
-          ></v-text-field>
+      <div class="hours__controls">
+        <v-select
+          v-model="preset"
+          :items="presetOptions"
+          :density="density"
+          hide-details
+          class="hours__preset"
+          aria-label="Date range preset"
+        />
+
+        <template v-if="preset === 'custom'">
+          <v-menu v-model="startMenu" :close-on-content-click="false">
+            <template #activator="{ props: menuProps }">
+              <v-text-field
+                v-bind="menuProps"
+                :model-value="formatDisplayDate(rawStartDate)"
+                label="Start"
+                readonly
+                prepend-inner-icon="mdi-calendar-start"
+                :density="density"
+                hide-details
+                class="hours__date"
+              />
+            </template>
+            <v-date-picker
+              v-model="rawStartDate"
+              :max="rawEndDate"
+              color="primary"
+              @update:model-value="startMenu = false"
+            />
+          </v-menu>
+
+          <v-menu v-model="endMenu" :close-on-content-click="false">
+            <template #activator="{ props: menuProps }">
+              <v-text-field
+                v-bind="menuProps"
+                :model-value="formatDisplayDate(rawEndDate)"
+                label="End"
+                readonly
+                prepend-inner-icon="mdi-calendar-end"
+                :density="density"
+                hide-details
+                class="hours__date"
+              />
+            </template>
+            <v-date-picker
+              v-model="rawEndDate"
+              :min="rawStartDate"
+              :max="today"
+              color="primary"
+              @update:model-value="endMenu = false"
+            />
+          </v-menu>
+
+          <v-btn
+            color="primary"
+            variant="flat"
+            prepend-icon="mdi-filter-outline"
+            :size="btnSize"
+            :loading="loading"
+            @click="applyFilters"
+          >
+            Apply
+          </v-btn>
         </template>
-        <v-date-picker
-          v-model="rawStartDate"
-          @update:model-value="startMenu = false"
-        ></v-date-picker>
-      </v-menu>
+      </div>
+    </div>
 
-      <v-menu v-model="endMenu" :close-on-content-click="false">
-        <template v-slot:activator="{ props }">
-          <v-text-field
-            v-bind="props"
-            :model-value="formatDisplayDate(rawEndDate)"
-            label="End Date"
-            readonly
-            prepend-inner-icon="mdi-calendar-end"
-            density="compact"
-            variant="outlined"
-            hide-details
-            :style="xs ? 'width: 100%' : 'width: 160px'"
-          ></v-text-field>
+    <v-divider />
+
+    <div class="hours__body">
+      <ActivityLoader v-if="loading" label="Loading chart data…" />
+
+      <v-alert v-else-if="error" type="error" variant="tonal">
+        {{ error }}
+        <template #append>
+          <v-btn variant="text" size="small" @click="applyFilters">Retry</v-btn>
         </template>
-        <v-date-picker
-          v-model="rawEndDate"
-          @update:model-value="endMenu = false"
-        ></v-date-picker>
-      </v-menu>
+      </v-alert>
 
-      <v-btn
-        color="primary"
-        variant="elevated"
-        prepend-icon="mdi-filter"
-        :loading="loading"
-        @click="applyFilters"
-      >
-        Filter
-      </v-btn>
-    </div>
-  </div>
+      <EmptyState
+        v-else-if="isEmpty"
+        title="No hours recorded"
+        description="There is no attendance data in the selected date range."
+        icon="mdi-chart-line-variant"
+      />
 
-  <v-card variant="outlined" class="pa-0 rounded-lg">
-    <div
-      v-if="loading"
-      class="d-flex align-center justify-center"
-      style="min-height: 400px"
-    >
-      <activity-loader label="Loading data..." />
-    </div>
-    <div v-else>
-      <v-card-text class="pa-4">
+      <template v-else>
         <apexchart
           type="line"
-          height="350"
+          :height="chartHeight"
           :options="chartOptions"
           :series="chartSeries"
-        ></apexchart>
-      </v-card-text>
-
-      <v-card-text class="text-caption text-medium-emphasis pt-0 pb-4 px-4">
-        Note: Graph data does not include overtime and absences.
-      </v-card-text>
+        />
+        <p class="hours__note">
+          Graph data does not include overtime and absences.
+        </p>
+      </template>
     </div>
   </v-card>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import apexchart from "vue3-apexcharts"; // Alias necesario para el template
-import { useAttendanceChart } from "@/composables/useAttendanceChart";
-import { useDisplay } from "vuetify/lib/composables/display.mjs";
+import { computed, onMounted, ref, watch } from 'vue'
+import apexchart from 'vue3-apexcharts'
+import { useAttendanceChart } from '@/composables/useAttendanceChart'
+import { useResponsive } from '@/composables/useResponsive'
+import ActivityLoader from '@/components/common/ActivityLoader.vue'
+import EmptyState from '@/components/common/EmptyState.vue'
 
-const { chartOptions, chartSeries, fetchChartData, loading } =
-  useAttendanceChart();
+type Preset = '7d' | '30d' | 'month' | 'custom'
 
-const { xs } = useDisplay();
+const { chartOptions, chartSeries, fetchChartData, loading, error, isEmpty } =
+  useAttendanceChart()
+const { density, btnSize, smAndDown, isUltraWide } = useResponsive()
 
-const filters = ref({
-  start: "",
-  end: "",
-});
+const today = new Date()
 
-const startMenu = ref(false);
-const endMenu = ref(false);
+const preset = ref<Preset>('30d')
+const presetOptions = [
+  { title: 'Last 7 days', value: '7d' },
+  { title: 'Last 30 days', value: '30d' },
+  { title: 'This month', value: 'month' },
+  { title: 'Custom range', value: 'custom' },
+]
 
-const rawStartDate = ref(new Date());
-const rawEndDate = ref(new Date());
+const startMenu = ref(false)
+const endMenu = ref(false)
 
-// 2. Fechas que REALMENTE se cargaron en la gráfica (Estado aplicado)
-const appliedStartDate = ref(new Date());
-const appliedEndDate = ref(new Date());
+const rawStartDate = ref(new Date())
+const rawEndDate = ref(new Date())
 
-// 3. El subtítulo ahora mira a las fechas APLICADAS
+// Fechas efectivamente cargadas en el gráfico; el subtítulo mira a estas y no a
+// las del selector, para no anunciar un rango que aún no se ha consultado.
+const appliedStartDate = ref(new Date())
+const appliedEndDate = ref(new Date())
+
+/** El gráfico necesita más alto en pantallas grandes y menos en móvil. */
+const chartHeight = computed(() => {
+  if (smAndDown.value) return 260
+  if (isUltraWide.value) return 460
+  return 350
+})
+
 const dateRangeLabel = computed(() => {
   const options: Intl.DateTimeFormatOptions = {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-  };
-  const start = appliedStartDate.value.toLocaleDateString("en-US", options);
-  const end = appliedEndDate.value.toLocaleDateString("en-US", options);
-  return `${start} — ${end}`;
-});
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }
+  const start = appliedStartDate.value.toLocaleDateString('en-US', options)
+  const end = appliedEndDate.value.toLocaleDateString('en-US', options)
+  return `${start} — ${end}`
+})
 
-const applyFilters = async () => {
-  // Solo cuando damos clic en Filter, igualamos las fechas
-  appliedStartDate.value = new Date(rawStartDate.value);
-  appliedEndDate.value = new Date(rawEndDate.value);
+function formatDisplayDate(date: Date): string {
+  return date ? date.toLocaleDateString('en-US') : ''
+}
 
-  const start = formatDateForAPI(appliedStartDate.value);
-  const end = formatDateForAPI(appliedEndDate.value);
+function formatDateForAPI(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
 
-  await fetchChartData(start, end);
-};
+/** Traduce el atajo elegido a un par de fechas concretas. */
+function resolvePreset(value: Preset): { start: Date; end: Date } | null {
+  const end = new Date()
+  const start = new Date()
 
-// 2. Formateador para los inputs (MM/DD/YYYY)
-const formatDisplayDate = (date: Date) => {
-  return date ? date.toLocaleDateString("en-US") : "";
-};
+  switch (value) {
+    case '7d':
+      start.setDate(end.getDate() - 7)
+      return { start, end }
+    case '30d':
+      start.setDate(end.getDate() - 30)
+      return { start, end }
+    case 'month':
+      return { start: new Date(end.getFullYear(), end.getMonth(), 1), end }
+    default:
+      return null
+  }
+}
 
-// 3. Formateador para la API (YYYY-MM-DD)
-const formatDateForAPI = (date: Date) => {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-};
+async function applyFilters(): Promise<void> {
+  appliedStartDate.value = new Date(rawStartDate.value)
+  appliedEndDate.value = new Date(rawEndDate.value)
+
+  await fetchChartData(
+    formatDateForAPI(appliedStartDate.value),
+    formatDateForAPI(appliedEndDate.value),
+  )
+}
+
+watch(preset, async (value) => {
+  const range = resolvePreset(value)
+  if (!range) return // 'custom': espera a que el usuario pulse Apply
+  rawStartDate.value = range.start
+  rawEndDate.value = range.end
+  await applyFilters()
+})
 
 onMounted(async () => {
-  // Inicialización por defecto
-  const today = new Date();
-  const past = new Date();
-  past.setDate(today.getDate() - 30);
-
-  rawStartDate.value = new Date(past);
-  rawEndDate.value = new Date(today);
-
-  // Al cargar por primera vez, aplicamos de una vez
-  appliedStartDate.value = new Date(past);
-  appliedEndDate.value = new Date(today);
-
-  await applyFilters();
-});
+  const range = resolvePreset('30d')!
+  rawStartDate.value = range.start
+  rawEndDate.value = range.end
+  await applyFilters()
+})
 </script>
+
+<style scoped>
+.hours__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--app-space-4);
+  padding: var(--app-space-5);
+}
+
+.hours__title {
+  font-size: var(--app-text-xl);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  margin: 0;
+}
+
+.hours__subtitle {
+  font-size: var(--app-text-sm);
+  color: rgb(var(--v-theme-on-surface-variant));
+  margin: var(--app-space-1) 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.hours__controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--app-space-2);
+}
+
+.hours__preset {
+  min-width: 10rem;
+}
+
+.hours__date {
+  min-width: 9rem;
+  max-width: 11rem;
+}
+
+.hours__body {
+  padding: var(--app-space-4);
+}
+
+.hours__note {
+  margin: var(--app-space-2) 0 0;
+  font-size: var(--app-text-xs);
+  color: rgb(var(--v-theme-on-surface-variant));
+}
+
+@media (max-width: 600px) {
+  .hours__head {
+    padding: var(--app-space-4);
+  }
+
+  .hours__controls {
+    width: 100%;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hours__date,
+  .hours__preset {
+    max-width: none;
+  }
+}
+</style>

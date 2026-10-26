@@ -1,0 +1,28 @@
+# nio-frontend -- compose de SERVIDOR (imagen desde GHCR, sin build).
+# Se copia a ~/NovaInOut/front.yml junto con front.env.
+# Servidor con docker-compose v1 (con guion): el proyecto se fija con -p.
+#
+#   docker-compose --env-file front.env -f front.yml -p nio-front pull
+#   docker-compose --env-file front.env -f front.yml -p nio-front up -d
+
+services:
+  front:
+    image: ghcr.io/novadrivingschool/nio-frontend:${FRONT_IMAGE_TAG:?falta FRONT_IMAGE_TAG en front.env}
+    container_name: nio-front-dev
+    restart: unless-stopped
+    # Red bridge por defecto: el servidor ya no tiene rangos libres para redes nuevas por proyecto.
+    network_mode: bridge
+    ports:
+      # Loopback: el nginx del host (nginx.host.conf) termina TLS y reenvía aquí.
+      - '127.0.0.1:${FRONT_HOST_PORT:-5080}:80'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:80/']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: '10m'
+        max-file: '3'

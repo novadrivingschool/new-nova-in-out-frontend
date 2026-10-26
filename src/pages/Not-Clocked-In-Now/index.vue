@@ -1,50 +1,28 @@
 <template>
-  <div class="pa-5">
-    <v-card class="pa-5 mb-5">
-      <div
-        class="d-flex align-center justify-space-between"
-        :class="xs ? 'flex-column ga-4' : ''"
-      >
-        <div class="d-flex align-center ga-4">
-          <v-icon icon="mdi-arrow-left" @click="router.back()" />
-          <h1>Not Clocked in now</h1>
-        </div>
-        <div>
-          <v-btn
-            prepend-icon="mdi-refresh"
-            variant="outlined"
-            @click="refreshTable"
-            >Refresh</v-btn
-          >
-        </div>
-      </div>
-    </v-card>
-    <v-card>
-      <AttendanceTable
-        ref="tableRef"
-        :fetch-fn="NovaInOutServices.getNotClockedInNow"
-      />
-    </v-card>
-  </div>
+  <PageContainer variant="fluid">
+    <PageHeader
+      title="Not clocked in now"
+      :subtitle="isToday ? 'Employees off the clock right now' : `Off the clock at end of day · ${label}`"
+      :back-to="dashboardLink"
+    />
+
+    <AttendanceTable
+      :fetch-fn="fetchFn"
+      hide-status
+      empty-title="Everyone is clocked in"
+      empty-description="There is no employee off the clock for this date."
+    />
+  </PageContainer>
 </template>
 
 <script setup lang="ts">
-import NovaInOutServices from "@/services/NovaInOutServices";
-import { getTodayString } from "@/utils/getTodayString";
-import { useDisplay } from "vuetify/lib/composables/display.mjs";
+import NovaInOutServices from '@/services/NovaInOutServices'
+import { useSelectedDate } from '@/composables/useSelectedDate'
+import PageContainer from '@/components/common/PageContainer.vue'
+import PageHeader from '@/components/common/PageHeader.vue'
+import AttendanceTable from '@/components/AdminDashboard/AttendanceTable.vue'
 
-const { xs } = useDisplay();
+const { isToday, label, dashboardLink } = useSelectedDate()
 
-const tableRef = ref();
-
-// 3. La función del botón ahora llama al hijo
-const refreshTable = () => {
-  if (tableRef.value) {
-    tableRef.value.loadData();
-  }
-};
-
-const router = useRouter();
+const fetchFn = (date: string) => NovaInOutServices.getDashboard(date).then((d) => d.notClockedIn)
 </script>
-
-<style scoped></style>

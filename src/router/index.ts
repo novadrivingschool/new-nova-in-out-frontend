@@ -7,7 +7,10 @@ import { useAuth } from '@/stores/auth/useAuth'
 
 declare module 'vue-router' {
   interface RouteMeta {
+    /** Restringe la ruta a estos roles. Vacío o ausente = cualquier autenticado. */
     roles?: string[]
+    /** Ruta accesible sin sesión. También oculta el cromo de la aplicación. */
+    public?: boolean
   }
 }
 
@@ -16,17 +19,28 @@ const router = createRouter({
   routes: setupLayouts(routes),
 })
 
-// Guard: todo privado salvo "/"
+// Guard: todo privado salvo las rutas marcadas con `meta.public`
 const authGuard: NavigationGuard = async (to) => {
   const auth = useAuth()
 
-  if (!auth.accessToken && to.path !== '/') {
+  if (to.meta?.public) return // login siempre accesible
+
+  // Si no hay access token pero sí refresh token → intentar refresh antes de mandar al login
+  if (!auth.accessToken && auth.refreshToken) {
+    try {
+      await auth.refreshNow()
+    } catch {
+      return { path: '/' } as RouteLocationRaw
+    }
+  }
+
+  // Si definitivamente no hay token → login
+  if (!auth.accessToken) {
     return { path: '/' } as RouteLocationRaw
   }
 
   // (opcional) si la ruta tiene restricción de roles
-  if (auth.accessToken && to.meta?.roles?.length) {
-    /* if (!auth.user && auth.hydrateMe) await auth.hydrateMe() */
+  if (to.meta?.roles?.length) {
     const ok = to.meta.roles.some(r => auth.user?.roles.includes(r))
     if (!ok) return { path: '/forbidden' } as RouteLocationRaw
   }

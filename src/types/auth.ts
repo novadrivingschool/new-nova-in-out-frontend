@@ -4,6 +4,12 @@ export interface LoginRequest {
   password: string;
 }
 
+/** Payload de `POST /auth/login/web` — el front web autentica por employee_number. */
+export interface LoginWebRequest {
+  employeeNumber: string;
+  password: string;
+}
+
 export interface TokensDto {
   accessToken: string;
   refreshToken: string;
@@ -23,6 +29,8 @@ export interface UserDto {
   firstName?: string;
   lastName?: string;
   avatarUrl?: string;
+  /** Identificador con el que el usuario inicia sesión en el front web. */
+  employee_number?: string;
 }
 
 export interface AuthResponseDto {
@@ -55,6 +63,10 @@ export interface CreateUserProfileDto {
   avatarUrl: string;
   metadata?: Record<string, any>;
   userName?: string;
+  /** Número de empleado EXTERNO (app de RR. HH.). Opcional y único. No es el del NIO. */
+  external_employee_number?: string;
+  /** Modo vinculado NIO + Activity Report. */
+  activity_linked?: boolean;
 }
 
 export interface CreateUserDto {
@@ -75,8 +87,13 @@ export interface UserProfile {
   avatarUrl?: string;
   metadata?: Record<string, any>;
   createdAt: string;
-  updatedtAt: string;
+  updatedAt: string;
+  /** Número del NIO: lo genera el servidor y es el ID de inicio de sesión. */
   employee_number?: string;
+  /** Número de empleado EXTERNO (app de RR. HH.); null/ausente si no tiene. */
+  external_employee_number?: string | null;
+  /** Modo vinculado: NIO y Activity Report se usan en conjunto (ver ficha del usuario). */
+  activity_linked?: boolean;
   userName?: string;
 }
 
@@ -90,18 +107,43 @@ export interface UserResponse {
   profile: UserProfile;
 }
 
+/**
+ * Campos del perfil que el cliente puede modificar.
+ *
+ * `id`, `createdAt` y `updatedAt` los gestiona el servidor. `employee_number`
+ * (el del NIO) lo genera el backend y es la credencial de acceso: no se edita.
+ * `external_employee_number` sí se captura a mano; vacío lo borra.
+ */
+export type UpdateUserProfileDto = Omit<
+  Partial<UserProfile>,
+  "id" | "createdAt" | "updatedAt" | "employee_number"
+>;
+
 export interface UpdateUserDto {
   id?: string;
   email?: string;
   roles?: string[];
   isActive?: boolean;
-  profile?: UserProfile;
+  profile?: UpdateUserProfileDto;
   password?: string;
 }
+
+/** Campos por los que el backend admite ordenar la lista de usuarios. */
+export type UserSortField =
+  | "createdAt"
+  | "email"
+  | "isActive"
+  | "firstName"
+  | "lastName"
+  | "employee_number";
 
 export interface UsersQueryFilterDto {
   isActive?: boolean;
   roles?: Role[];
+  /** Búsqueda libre sobre email, nombre, apellido, username y employee number. */
+  search?: string;
+  sortBy?: UserSortField;
+  sortDir?: "asc" | "desc";
   page?: number;
   limit?: number;
 }

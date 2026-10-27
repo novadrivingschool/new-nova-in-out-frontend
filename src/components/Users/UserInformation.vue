@@ -213,6 +213,27 @@
         </div>
       </v-card>
 
+      <!-- ═══ Testing tools: solo dev/test, solo super admin, solo en edición ═══ -->
+      <v-card v-if="isEditing && canManageDevBot" class="mb-4">
+        <div class="user-info__section-head">
+          <span class="app-eyebrow">Testing tools (dev only)</span>
+        </div>
+        <v-divider />
+        <div class="user-info__section-body">
+          <v-switch
+            v-model="formData.profile.dev_activity_bot"
+            label="Show the activity bot in this user's NIO app"
+            color="warning"
+            inset
+            hide-details="auto"
+          />
+          <p class="text-caption text-medium-emphasis mt-2 mb-0">
+            For testing the activity monitor. Only works when the NIO app runs in dev mode (it is not part of
+            the installer). Super admins only; requires VITE_DEV_ACTIVITY_BOT=true.
+          </p>
+        </div>
+      </v-card>
+
       <!-- ═══ Acceso ═══ -->
       <v-card class="mb-4">
         <div class="user-info__section-head">
@@ -370,11 +391,24 @@ import {
 } from '@/types/auth'
 import { usersService } from '@/services/users.service'
 import { useResponsive } from '@/composables/useResponsive'
+import { useAuth } from '@/stores/auth/useAuth'
 
 const props = defineProps<{ user: UserResponse; autoEdit?: boolean }>()
 const emit = defineEmits<{ (e: 'updated', user: UserResponse): void }>()
 
 const { density, btnSize, fieldCols, fieldColsWide } = useResponsive()
+
+const auth = useAuth()
+
+/**
+ * Switch del bot de pruebas (solo dev/test): visible únicamente si el usuario logueado es
+ * super_admin Y VITE_DEV_ACTIVITY_BOT=true. El candado real está en el backend (403).
+ */
+const canManageDevBot = computed(
+  () =>
+    import.meta.env.VITE_DEV_ACTIVITY_BOT === 'true' &&
+    !!auth.user?.roles?.includes(Role.SUPER_ADMIN),
+)
 
 const formRef = ref<any>(null)
 const isFormValid = ref(false)
@@ -418,6 +452,8 @@ function snapshot(user: UserResponse) {
       avatarUrl: user.profile?.avatarUrl ?? '',
       external_employee_number: user.profile?.external_employee_number ?? '',
       activity_linked: user.profile?.activity_linked ?? false,
+      // Sin default: si el valor no cambia, buildPayload() no lo envía (el backend solo lo acepta de super_admin).
+      dev_activity_bot: user.profile?.dev_activity_bot,
     } as UpdateUserProfileDto,
   }
 }

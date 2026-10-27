@@ -78,6 +78,8 @@ export function sourceLabel(source?: string | null): string {
       return 'Activity Report'
     case 'ADMIN_FORCE':
       return 'Admin'
+    case 'APP_LOGOUT':
+      return 'NIO log out'
     default:
       return 'Desktop app'
   }

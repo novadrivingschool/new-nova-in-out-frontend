@@ -122,6 +122,12 @@
               <dt>Origin</dt>
               <dd>Activity Report (requested from the web)</dd>
             </template>
+            <template v-if="image.source === 'APP_LOGOUT'">
+              <dt>Origin</dt>
+              <dd>NIO app (automatic clock out on log out)</dd>
+              <dt>Reason</dt>
+              <dd>NIO app log out</dd>
+            </template>
             <template v-if="image.adminClockOut">
               <dt>Closed by</dt>
               <dd>

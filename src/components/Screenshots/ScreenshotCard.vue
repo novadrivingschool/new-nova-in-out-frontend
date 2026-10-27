@@ -95,6 +95,13 @@
       <div v-else-if="isSelfClockOut" class="shot__reason" :title="adminTitle">
         Reason: {{ adminReason }}
       </div>
+      <div
+        v-else-if="fromLogout"
+        class="shot__reason"
+        title="Automatic clock out made when the employee logged out of the NIO app"
+      >
+        Reason: NIO app log out
+      </div>
 
       <div v-if="showProgress" class="shot__progress">
         <div class="shot__progress-head">
@@ -156,6 +163,9 @@ const showProgress = computed(() => shouldShowProgress(props.image))
 
 /** Clock pedido desde el Activity Report (web), tanto Clock In como Clock Out. */
 const fromActivity = computed(() => props.image.source === 'ACTIVITY_REPORT')
+
+/** Clock out automático por cerrar sesión en la app NIO (source APP_LOGOUT). */
+const fromLogout = computed(() => props.image.source === 'APP_LOGOUT')
 
 /** CLOCK_OUT hecho por un admin (FORCE_CLOCK_OUT). */
 const isSelfClockOut = computed(() => props.image.adminClockOut?.kind === 'SELF')

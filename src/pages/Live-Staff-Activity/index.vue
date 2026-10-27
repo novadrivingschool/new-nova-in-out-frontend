@@ -24,7 +24,8 @@
         <span class="live__status">
           <span class="live__dot" :class="{ 'live__dot--idle': !activeCount }" />
           {{ activeCount }} active {{ activeCount === 1 ? 'session' : 'sessions' }}
-          <span v-if="attentionCount" class="live__warn">· {{ attentionCount }} without connection</span>
+          <span v-if="noConnectionCount" class="live__warn">· {{ noConnectionCount }} without connection</span>
+          <span v-if="outOfSyncCount" class="live__warn">· {{ outOfSyncCount }} out of sync</span>
           <span v-if="offlineCount" class="live__muted">· {{ offlineCount }} offline</span>
         </span>
 
@@ -65,13 +66,41 @@
         </template>
 
         <template #item.status="{ item }">
-          <span
-            class="live__badge"
-            :class="item.online ? 'live__badge--on' : item.hasOpenSession ? 'live__badge--warn' : 'live__badge--off'"
-          >
-            <span class="live__badge-dot" />
-            {{ item.status }}
-          </span>
+          <div class="d-flex flex-column align-start ga-1">
+            <div class="d-flex align-center ga-2">
+              <span
+                class="live__badge"
+                :class="item.status === 'Active' ? 'live__badge--on' : item.status === 'Offline' ? 'live__badge--off' : 'live__badge--warn'"
+                :title="item.statusDetail"
+              >
+                <span class="live__badge-dot" />
+                {{ item.status }}
+              </span>
+              <v-chip
+                size="x-small"
+                label
+                :color="item.linked ? 'primary' : undefined"
+                :variant="item.linked ? 'flat' : 'outlined'"
+              >
+                {{ item.mode }}
+              </v-chip>
+            </div>
+            <!-- Modo NIO + AR: cuál lado está bien y cuál no -->
+            <div v-if="item.linked" class="d-flex flex-wrap ga-1">
+              <v-chip
+                v-for="side in item.sides"
+                :key="side.name"
+                size="x-small"
+                label
+                variant="tonal"
+                :color="side.color"
+                :prepend-icon="side.icon"
+                :title="side.title"
+              >
+                {{ side.name }} · {{ side.text }}
+              </v-chip>
+            </div>
+          </div>
         </template>
 
         <template #item.clockedInAt="{ item }">
@@ -202,7 +231,13 @@ import DataTableResponsive, {
 
 interface DeviceUser {
   email?: string | null
-  profile?: { firstName?: string; lastName?: string; employee_number?: string } | null
+  profile?: {
+    firstName?: string
+    lastName?: string
+    employee_number?: string
+    /** true = modo NIO + AR (clock in/out siempre juntos); false = NIO independiente. */
+    activity_linked?: boolean
+  } | null
 }
 
 interface DeviceRecord {
@@ -214,6 +249,8 @@ interface DeviceRecord {
   user?: DeviceUser | null
   /** Presencia real: hay un socket conectado (se abre en clock-in, se cierra en clock-out). */
   online?: boolean
+  /** Hay un socket registrado (con o sin turno). */
+  connected?: boolean
 }
 
 /** El listado es un monitor en vivo: se refresca solo. */
@@ -238,6 +275,8 @@ const devices = ref<DeviceRecord[]>([])
 
 /** Último CLOCK_IN de hoy por employee_number (fuente: asistencia, no el socket). */
 const clockIns = ref<Record<string, string>>({})
+/** employee_numbers con el Activity Report abierto hoy. null = no se pudo consultar. */
+const arOpen = ref<Set<string> | null>(null)
 /** Clock outs hechos por admin, por employee_number (historial independiente del handshake). */
 const adminCounts = ref<Record<string, number>>({})
 const adminHistoryRefresh = ref(0)
@@ -269,7 +308,43 @@ const allRows = computed(() =>
     const fullName = fullNameFromUser(owner)
 
     const online = device.online === true
+    const connected = device.connected === true
     const empNumber = owner?.profile?.employee_number ?? ''
+    const linked = owner?.profile?.activity_linked === true
+    const nioOpen = !!(empNumber && clockIns.value[empNumber])
+    // Si AR no se pudo consultar no se puede afirmar desincronización.
+    const arKnown = arOpen.value !== null
+    const arIsOpen = !!(empNumber && arOpen.value?.has(empNumber))
+    // NIO + AR van de la mano: turno abierto en uno solo es un estado inválido.
+    const outOfSync = linked && arKnown && nioOpen !== arIsOpen
+    const hasOpenSession = nioOpen || (linked && arIsOpen)
+    // Prioridad al que ya tiene el clock in: ese es el activo; el otro es el desincronizado.
+    const syncNote = outOfSync
+      ? nioOpen
+        ? 'NIO clocked in · Activity not synced'
+        : 'Activity clocked in · NIO not synced'
+      : ''
+    // Por lado: el que tiene el turno abierto está bien; el otro, si falta, es el desincronizado.
+    const sideOf = (name: string, open: boolean, known = true) => {
+      if (!known) return { name, text: 'unknown', color: undefined, icon: 'mdi-help-circle-outline', title: `${name}: unknown` }
+      if (open) return { name, text: 'Clocked in', color: 'success', icon: 'mdi-check-circle', title: `${name}: clocked in (OK)` }
+      if (outOfSync) return { name, text: 'Not clocked in', color: 'warning', icon: 'mdi-alert-circle', title: `${name}: not clocked in — out of sync` }
+      return { name, text: 'Clocked out', color: undefined, icon: 'mdi-circle-outline', title: `${name}: clocked out` }
+    }
+    const sides = [sideOf('NIO', nioOpen), sideOf('Activity', arIsOpen, arKnown)]
+    const status: 'Active' | 'No connection' | 'Out of sync' | 'Offline' = outOfSync
+      ? 'Out of sync'
+      : online
+        ? 'Active'
+        : hasOpenSession
+          ? 'No connection'
+          : 'Offline'
+    const statusDetail = [
+      `Mode: ${linked ? 'NIO + AR' : 'NIO only'}`,
+      `Socket: ${connected ? 'connected' : 'disconnected'}${connected ? (online ? ' (on shift)' : ' (off shift)') : ''}`,
+      `NIO shift: ${nioOpen ? 'open' : 'closed'}`,
+      ...(linked ? [`AR shift: ${arKnown ? (arIsOpen ? 'open' : 'closed') : 'unknown'}`] : []),
+    ].join(' · ')
 
     const initials =
       [owner?.profile?.firstName?.[0], owner?.profile?.lastName?.[0]]
@@ -295,31 +370,34 @@ const allRows = computed(() =>
       fullName,
       initials,
       online,
-      status: online
-        ? 'Active'
-        : empNumber && clockIns.value[empNumber]
-          ? 'No connection'
-          : 'Offline',
+      connected,
+      linked,
+      mode: linked ? 'NIO + AR' : 'NIO',
+      status,
+      statusDetail: syncNote ? `${syncNote} · ${statusDetail}` : statusDetail,
+      syncNote,
+      sides,
       clockedInAt: (empNumber && clockIns.value[empNumber]) || '',
       employeeNumber: empNumber,
       // Turno abierto en asistencia aunque el socket ya no esté (sin luz / sin internet).
-      hasOpenSession: !!(empNumber && clockIns.value[empNumber]),
+      hasOpenSession,
       adminClockOutCount: (empNumber && adminCounts.value[empNumber]) || 0,
       email: owner?.email ?? null,
     }
   }),
 )
 
-const activeCount = computed(() => allRows.value.filter((r) => r.online).length)
-const attentionCount = computed(
-  () => allRows.value.filter((r) => !r.online && r.hasOpenSession).length,
-)
+const activeCount = computed(() => allRows.value.filter((r) => r.status === 'Active').length)
+const noConnectionCount = computed(() => allRows.value.filter((r) => r.status === 'No connection').length)
+const outOfSyncCount = computed(() => allRows.value.filter((r) => r.status === 'Out of sync').length)
 const offlineCount = computed(
-  () => allRows.value.length - activeCount.value - attentionCount.value,
+  () => allRows.value.length - activeCount.value - noConnectionCount.value - outOfSyncCount.value,
 )
 /** Por defecto: activos + turnos abiertos sin conexión (para poder hacerles clock out). */
 const rows = computed(() =>
-  showOffline.value ? allRows.value : allRows.value.filter((r) => r.online || r.hasOpenSession),
+  showOffline.value
+    ? allRows.value
+    : allRows.value.filter((r) => r.online || r.hasOpenSession || r.status === 'Out of sync'),
 )
 
 /** Reintenta una vez tras refrescar el token si la primera llamada da 401. */
@@ -367,7 +445,7 @@ async function loadDevices(): Promise<void> {
   try {
     // Vista de monitoreo: siempre todos los usuarios (el backend exige rol admin).
     const url = '/devices/online?all=true'
-    const [response, clocked, counts] = await Promise.all([
+    const [response, clocked, counts, arOpenList] = await Promise.all([
       withAuthRetry(() => http.get(url), `GET ${url}`),
       // El clock-in viene de asistencia; si falla no debe tumbar la vista.
       NovaInOutServices.getClockedInNow(getTodayString()).catch((err: unknown) => {
@@ -378,7 +456,13 @@ async function loadDevices(): Promise<void> {
         console.warn('[live-staff] admin clock-out counts falló', err)
         return {} as Record<string, number>
       }),
+      // Activity Report abierto hoy; si falla no se afirma desincronización.
+      NovaInOutServices.getActivityOpenNow(getTodayString()).catch((err: unknown) => {
+        console.warn('[live-staff] activity open-now falló; modo NIO+AR sin validación de AR', err)
+        return null
+      }),
     ])
+    arOpen.value = Array.isArray(arOpenList) ? new Set(arOpenList) : null
     adminCounts.value = counts ?? {}
     user.value = response.data?.user ?? null
     devices.value = Array.isArray(response.data?.devices)

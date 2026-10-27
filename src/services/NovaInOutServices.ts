@@ -434,6 +434,15 @@ const NovaInOutServices = {
     );
     return response.data ?? {};
   },
+
+  /** Admin: employee_numbers con el Activity (AR) abierto hoy. Panel en vivo. */
+  async getActivityOpenNow(date: string): Promise<string[]> {
+    const response = await http.get<{ employee_numbers: string[] }>(
+      `${API_NOVA_IN_OUT_URL}/nova-in-out/activity/open-now`,
+      { params: { date } },
+    );
+    return response.data?.employee_numbers ?? [];
+  },
 };
 
 export default NovaInOutServices;

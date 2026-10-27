@@ -39,7 +39,7 @@ export interface RawScreenshotRecord {
   /** Intervalo de captura (s) vigente cuando se creó el registro. Ausente en datos antiguos. */
   slot_seconds?: number
   admin_clock_out?: AdminClockOutInfo | null
-  /** Origen del clock: MANUAL (app), ACTIVITY_REPORT (web) o ADMIN_FORCE. Ausente en datos antiguos. */
+  /** Origen del clock: MANUAL (app), ACTIVITY_REPORT (web), ADMIN_FORCE o APP_LOGOUT (log out de la app). Ausente en datos antiguos. */
   source?: string | null
 }
 

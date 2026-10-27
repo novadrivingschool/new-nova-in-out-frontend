@@ -94,6 +94,8 @@ export interface UserProfile {
   external_employee_number?: string | null;
   /** Modo vinculado: NIO y Activity Report se usan en conjunto (ver ficha del usuario). */
   activity_linked?: boolean;
+  /** SOLO dev/pruebas: muestra el bot de actividad en la app NIO del usuario (switch solo para super_admin). */
+  dev_activity_bot?: boolean;
   userName?: string;
 }
 

@@ -8,56 +8,87 @@
 -->
 <template>
   <PageContainer variant="fluid">
-    <PageHeader
-      title="Activity Report"
-      subtitle="Activity is recorded here; NIO is updated too when your desktop app is active"
-    />
-
-    <!-- Hero -->
-    <v-card class="ar-hero pa-5 mb-4" variant="flat" theme="dark">
-      <div class="d-flex flex-wrap justify-space-between align-start ga-4">
-        <div>
-          <div class="ar-employee">{{ fullName }}</div>
-          <div class="d-flex flex-wrap align-center ga-2 mt-2">
-            <v-chip :color="activityIn ? 'success' : undefined" size="small" variant="flat">
-              <v-icon start size="12">mdi-circle</v-icon>
-              Activity: {{ activityIn ? (lunchOpen ? 'On lunch' : 'Clocked In') : 'Clocked Out' }}
-            </v-chip>
-            <v-chip :color="nioIn ? 'success' : undefined" size="small" variant="flat">
-              <v-icon start size="12">mdi-circle</v-icon>
-              NIO: {{ nioIn ? 'Clocked In' : 'Clocked Out' }}
-            </v-chip>
-            <v-tooltip v-if="linked" location="bottom" max-width="300">
-              <template #activator="{ props: tip }">
-                <v-chip v-bind="tip" size="small" variant="flat" color="primary" prepend-icon="mdi-link-variant">
-                  NIO + AR
-                </v-chip>
-              </template>
-              Your NIO app and this Activity Report work together: you can only Clock In / Clock Out here while
-              your NIO desktop app is open, and the clock button inside the NIO app is disabled.
-            </v-tooltip>
-            <v-btn size="x-small" variant="text" prepend-icon="mdi-refresh" :loading="refreshing" @click="refreshAll">
-              Refresh
-            </v-btn>
-          </div>
-        </div>
-        <div class="text-end">
-          <div class="ar-clock-label">CHICAGO TIME</div>
-          <div class="ar-clock">{{ nowTime }}</div>
-          <div class="ar-date">{{ today }}</div>
+    <!-- Encabezado: marca + estado + app NIO, en una sola tarjeta de dos líneas -->
+    <v-card class="ar-head mb-4" variant="flat" border>
+      <div class="ar-head__top">
+        <h1 class="ar-brand">
+          <span class="ar-brand__mark">N<span class="ar-brand__accent">IO</span></span>
+          <span class="ar-brand__divider" aria-hidden="true">/</span>
+          <span class="ar-brand__page">Activity Report</span>
+        </h1>
+        <div class="ar-head__time">
+          <span class="ar-clock">{{ nowTime }}</span>
+          <span class="ar-head__time-meta">Chicago · {{ today }}</span>
         </div>
       </div>
-    </v-card>
 
-    <!-- Estado de la app de escritorio -->
-    <v-card class="ar-app mb-4 pa-4" :class="`ar-app--${appState.kind}`" variant="flat" role="status" aria-live="polite">
-      <div class="d-flex align-center ga-4">
-        <span class="ar-dot" :class="`ar-dot--${appState.kind}`" />
-        <v-icon size="32">{{ appState.icon }}</v-icon>
-        <div>
-          <div class="ar-app-title">{{ appState.title }}</div>
-          <div class="text-body-2">{{ appState.detail }}</div>
+      <div class="ar-head__bottom">
+        <span class="ar-employee">{{ fullName }}</span>
+
+        <!-- Informativo: solo texto con punto de color, sin relleno (no se confunde con un botón) -->
+        <div class="ar-info" role="status" aria-live="polite">
+          <span class="ar-stat" :class="activityIn ? 'ar-stat--ok' : outOfSync ? 'ar-stat--warn' : ''">
+            <i class="ar-stat__dot" />Activity: {{ activityIn ? (lunchOpen ? 'On lunch' : 'Clocked In') : 'Clocked Out' }}
+          </span>
+          <span class="ar-stat" :class="nioIn ? 'ar-stat--ok' : outOfSync ? 'ar-stat--warn' : ''">
+            <i class="ar-stat__dot" />NIO: {{ nioIn ? 'Clocked In' : 'Clocked Out' }}
+          </span>
+
+          <v-tooltip v-if="linked" location="bottom" max-width="300">
+            <template #activator="{ props: tip }">
+              <span v-bind="tip" class="ar-mode ar-mode--linked"><v-icon size="14">mdi-link-variant</v-icon>NIO + AR</span>
+            </template>
+            Your NIO app and this Activity Report work together: you can only Clock In / Clock Out here while
+            your NIO desktop app is open, and the clock button inside the NIO app is disabled.
+          </v-tooltip>
+          <v-tooltip v-else location="bottom" max-width="300">
+            <template #activator="{ props: tip }">
+              <span v-bind="tip" class="ar-mode"><v-icon size="14">mdi-link-variant-off</v-icon>NIO | AR</span>
+            </template>
+            Independent mode: the NIO app and this Activity Report each have their own clock. Clocking here does
+            not affect the NIO app, and vice versa.
+          </v-tooltip>
+
+          <v-tooltip location="bottom" max-width="320">
+            <template #activator="{ props: tip }">
+              <span
+                v-bind="tip"
+                class="ar-stat"
+                :class="appState.kind === 'online' ? 'ar-stat--ok' : appState.kind === 'offline' ? 'ar-stat--err' : ''"
+              >
+                <i class="ar-stat__dot" :class="{ 'ar-stat__dot--pulse': appState.kind === 'online' }" />{{ appState.title }}
+              </span>
+            </template>
+            {{ appState.detail }}
+          </v-tooltip>
         </div>
+
+        <v-spacer />
+
+        <!-- Acciones: botones -->
+        <div class="ar-actions">
+          <v-btn
+            v-if="outOfSync"
+            size="small"
+            variant="flat"
+            color="warning"
+            prepend-icon="mdi-sync"
+            :loading="busy === 'SYNC'"
+            :disabled="busy !== null"
+            @click="syncModes"
+          >
+            Sync
+          </v-btn>
+          <v-btn size="small" variant="outlined" prepend-icon="mdi-refresh" :loading="refreshing" @click="refreshAll">
+            Refresh
+          </v-btn>
+        </div>
+      </div>
+
+      <!-- Aviso de desincronización: texto de advertencia, no accionable -->
+      <div v-if="outOfSync" class="ar-warn" role="alert">
+        <v-icon size="16">mdi-sync-alert</v-icon>
+        <span><strong>Out of sync</strong> · {{ syncNote }}. Use <strong>Sync</strong> to align both.</span>
       </div>
     </v-card>
 
@@ -225,9 +256,15 @@
               <v-list-item-subtitle v-if="e.via === 'ADMIN' && e.note" class="ar-note">
                 Note: {{ e.note }}
               </v-list-item-subtitle>
-              <template v-if="e.via === 'SERVER' || e.via === 'ADMIN'" #append>
+              <template v-if="e.via === 'SERVER' || e.via === 'ADMIN' || e.reason === 'NIO_LOGOUT'" #append>
                 <v-chip size="x-small" variant="tonal" :color="e.via === 'ADMIN' ? 'error' : 'warning'">
-                  {{ e.via === 'ADMIN' ? `Closed by admin${e.admin_name ? ': ' + e.admin_name : ''}` : 'Closed by me' }}
+                  {{
+                    e.reason === 'NIO_LOGOUT'
+                      ? 'Closed by NIO log out'
+                      : e.via === 'ADMIN'
+                        ? `Closed by admin${e.admin_name ? ': ' + e.admin_name : ''}`
+                        : 'Closed by me'
+                  }}
                 </v-chip>
               </template>
             </v-list-item>
@@ -298,7 +335,7 @@
       </v-card>
     </v-dialog>
 
-    <v-snackbar v-model="snack.show" :color="snack.color" :timeout="5000" location="top" multi-line>
+    <v-snackbar v-model="snack.show" :color="snack.color" :timeout="5000" multi-line>
       {{ snack.text }}
     </v-snackbar>
   </PageContainer>
@@ -307,7 +344,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, reactive, ref } from 'vue'
 import PageContainer from '@/components/common/PageContainer.vue'
-import PageHeader from '@/components/common/PageHeader.vue'
 import { useAuth } from '@/stores/auth/useAuth'
 import NovaInOutServices from '@/services/NovaInOutServices'
 import { useAdminSocket } from '@/composables/useAdminSocket'
@@ -360,7 +396,7 @@ const external = ref(readStoredExternal())
 const records = ref<ClockRecord[]>([])
 const status = ref<RemoteClockStatus | null>(null)
 const activity = ref<ActivityDay | null>(null)
-const busy = ref<'CLOCK_IN' | 'CLOCK_OUT' | 'LUNCH_IN' | 'LUNCH_OUT' | null>(null)
+const busy = ref<'CLOCK_IN' | 'CLOCK_OUT' | 'LUNCH_IN' | 'LUNCH_OUT' | 'SYNC' | null>(null)
 const refreshing = ref(false)
 
 const nowTime = ref(chicagoTime())
@@ -378,6 +414,15 @@ const nioIn = computed(() => isClockedIn(records.value))
 const activityEvents = computed(() => activity.value?.events ?? [])
 const linked = computed(() => activity.value?.linked ?? false)
 const activityIn = computed(() => activity.value?.state.clockedIn ?? false)
+/** Modo NIO + AR: los dos van de la mano; turno abierto en uno solo = desincronizado. */
+const outOfSync = computed(() => linked.value && nioIn.value !== activityIn.value)
+const syncNote = computed(() =>
+  !outOfSync.value
+    ? ''
+    : nioIn.value
+      ? 'NIO is clocked in, Activity is not'
+      : 'Activity is clocked in, NIO is not',
+)
 const lunchOpen = computed(() => activity.value?.state.lunchOpen ?? false)
 const activityRows = computed(() =>
   [...activityEvents.value].sort(
@@ -461,6 +506,7 @@ function activityTitle(e: ActivityEvent): string {
   return isLunchOpen(e) ? 'Lunch · in progress' : 'Lunch'
 }
 function reasonLabel(code: string): string {
+  if (code === 'NIO_LOGOUT') return 'NIO app log out'
   return (
     (SELF_CLOCK_OUT_REASON_LABEL as Record<string, string>)[code] ??
     (FORCE_CLOCK_OUT_REASON_LABEL as Record<string, string>)[code] ??
@@ -487,7 +533,7 @@ const appState = computed(() => {
       title: 'NIO OFFLINE',
       detail: linked.value
         ? 'NIO + AR: Clock In / Clock Out here are blocked until your NIO app is open.'
-        : 'Activity still works; NIO is only updated when your desktop app is active.',
+        : 'Activity works independently; your NIO app has its own clock.',
     }
   }
   if (linked.value && localCheck.value?.checked && !localCheck.value.ok) {
@@ -648,7 +694,14 @@ async function send(action: 'CLOCK_IN' | 'CLOCK_OUT'): Promise<boolean> {
     }
     await loadActivity()
 
-    // 2) NIO: solo si el usuario tiene la app de escritorio activa. Es opcional y no bloquea al Activity.
+    // Modo independiente (NIO | AR): el Activity NO controla la app NIO. Cada app hace su clock.
+    if (!linked.value) {
+      notify(`${label} registered in Activity.`)
+      await loadRecords()
+      return true
+    }
+
+    // 2) Modo NIO + AR: el mismo clock se replica en la app NIO (que debe estar activa).
     await loadStatus()
     if (!status.value?.connected) {
       notify(`${label} registered in Activity. NIO unchanged (desktop app offline).`, 'info')
@@ -671,6 +724,54 @@ async function send(action: 'CLOCK_IN' | 'CLOCK_OUT'): Promise<boolean> {
     }
     await loadRecords()
     return true
+  } finally {
+    busy.value = null
+  }
+}
+
+/**
+ * Modo NIO + AR desincronizado: el lado que YA tiene el clock in manda; el otro hace Clock In.
+ * (En modo vinculado el botón de clock de la app NIO está deshabilitado, por eso se corrige desde aquí.)
+ */
+async function syncModes() {
+  if (!outOfSync.value || busy.value !== null) return
+  if (!external.value.trim()) {
+    notify('Enter your external employee number first.', 'warning')
+    return
+  }
+  busy.value = 'SYNC'
+  try {
+    await loadStatus()
+    if (!appConnected.value) {
+      notify(friendly({ code: 'DESKTOP_APP_REQUIRED', message: '' }, 'CLOCK_IN'), 'warning')
+      return
+    }
+    if (nioIn.value) {
+      // NIO ya tiene clock in → el Activity es el que falta (exige la verificación de misma máquina).
+      let nonce: string
+      try {
+        nonce = await localAppService.prepareClockNonce()
+      } catch (e) {
+        notify(friendly(e as RemoteClockError, 'CLOCK_IN'), 'warning')
+        void runLocalCheck()
+        return
+      }
+      await remoteClockService.activityClock(external.value.trim(), 'CLOCK_IN', crypto.randomUUID(), nonce)
+      rememberExternal()
+      await loadActivity()
+      notify('Synced: Clock In registered in Activity.')
+    } else {
+      // Activity ya tiene clock in → el NIO es el que falta: se le pide el clock a la app.
+      const res = await remoteClockService.request(external.value.trim(), 'CLOCK_IN')
+      if (!res.alreadyInState) localCooldownEnd.value = Date.now() + COOLDOWN_SEC * 1000
+      notify('Synced: Clock In registered in NIO.')
+    }
+    await loadRecords()
+    await loadActivity()
+  } catch (e) {
+    const err = e as RemoteClockError
+    notify(friendly(err, 'CLOCK_IN'), err.status === 403 ? 'error' : 'warning')
+    if (linked.value) void runLocalCheck()
   } finally {
     busy.value = null
   }
@@ -783,17 +884,37 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-.ar-hero {
-  background: linear-gradient(135deg, rgb(var(--v-theme-primary)) 0%, #1e293b 100%);
-  color: #fff;
-}
+.ar-head { padding: var(--app-space-4, 16px) var(--app-space-5, 20px); }
+.ar-head__top { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.ar-head__bottom { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.ar-head__time { display: flex; align-items: baseline; gap: 10px; }
+.ar-head__time-meta { font-size: var(--app-text-xs, 0.75rem); color: rgb(var(--v-theme-on-surface-variant)); }
+
+/* Marca: misma construcción que el logo del shell (N + IO en color primario, divisor, sección) */
+.ar-brand { display: flex; align-items: baseline; gap: 8px; margin: 0; min-width: 0; }
+.ar-brand__mark { font-size: var(--app-text-xl, 1.25rem); font-weight: 650; letter-spacing: var(--app-tracking-tighter, -0.03em); }
+.ar-brand__accent { color: rgb(var(--v-theme-primary)); }
+.ar-brand__divider { color: rgb(var(--v-theme-on-surface-variant)); opacity: 0.45; font-size: var(--app-text-md, 0.9375rem); }
+.ar-brand__page { font-size: var(--app-text-lg, 1.0625rem); font-weight: 450; color: rgb(var(--v-theme-on-surface-variant)); white-space: nowrap; }
+
+
+/* Informativo (texto) vs. acciones (botones) */
+.ar-info { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 16px; }
+.ar-actions { display: flex; align-items: center; gap: 8px; }
+.ar-stat { display: inline-flex; align-items: center; gap: 6px; font-size: var(--app-text-sm, 0.8125rem); color: rgb(var(--v-theme-on-surface-variant)); white-space: nowrap; }
+.ar-stat__dot { width: 8px; height: 8px; border-radius: 50%; background: rgba(var(--v-theme-on-surface), 0.35); display: inline-block; }
+.ar-stat--ok { color: rgb(var(--v-theme-on-surface)); }
+.ar-stat--ok .ar-stat__dot { background: rgb(var(--v-theme-success)); }
+.ar-stat--warn { color: rgb(var(--v-theme-warning)); font-weight: 600; }
+.ar-stat--warn .ar-stat__dot { background: rgb(var(--v-theme-warning)); }
+.ar-stat--err { color: rgb(var(--v-theme-error)); }
+.ar-stat--err .ar-stat__dot { background: rgb(var(--v-theme-error)); }
+.ar-stat__dot--pulse { animation: ar-pulse 1.6s infinite; }
+.ar-mode { display: inline-flex; align-items: center; gap: 4px; font-size: var(--app-text-xs, 0.75rem); font-weight: 600; letter-spacing: 0.02em; padding: 1px 8px; border-radius: 4px; border: 1px dashed rgba(var(--v-theme-on-surface), 0.35); color: rgb(var(--v-theme-on-surface-variant)); cursor: default; }
+.ar-mode--linked { border-style: solid; border-color: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-primary)); }
+.ar-warn { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: var(--app-text-sm, 0.8125rem); color: rgb(var(--v-theme-warning)); background: rgba(var(--v-theme-warning), 0.1); border-inline-start: 3px solid rgb(var(--v-theme-warning)); }
 .ar-events { max-height: 420px; overflow-y: auto; }
 
-.ar-app { border: 2px solid transparent; }
-.ar-app--online { background: rgba(var(--v-theme-success), 0.14); border-color: rgb(var(--v-theme-success)); }
-.ar-app--offline { background: rgba(var(--v-theme-error), 0.14); border-color: rgb(var(--v-theme-error)); }
-.ar-app--unknown { background: rgba(var(--v-theme-on-surface), 0.06); }
-.ar-app-title { font-size: 1.15rem; font-weight: 700; letter-spacing: 0.02em; }
 .ar-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
 .ar-dot--online { background: rgb(var(--v-theme-success)); animation: ar-pulse 1.6s infinite; }
 .ar-dot--offline { background: rgb(var(--v-theme-error)); }
@@ -804,10 +925,8 @@ onBeforeUnmount(() => {
   100% { box-shadow: 0 0 0 0 rgba(var(--v-theme-success), 0); }
 }
 @media (prefers-reduced-motion: reduce) { .ar-dot--online { animation: none; } }
-.ar-employee { font-size: 1.25rem; font-weight: 600; }
-.ar-clock-label { font-size: 0.65rem; letter-spacing: 0.12em; opacity: 0.7; }
-.ar-clock { font-size: 2rem; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 1.1; }
-.ar-date { font-size: 0.8rem; opacity: 0.75; }
+.ar-employee { font-size: var(--app-text-md, 0.9375rem); font-weight: 600; margin-inline-end: 8px; }
+.ar-clock { font-size: var(--app-text-xl, 1.25rem); font-weight: 650; font-variant-numeric: tabular-nums; letter-spacing: var(--app-tracking-tighter, -0.03em); }
 
 .ar-action {
   display: flex;

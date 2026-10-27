@@ -35,7 +35,7 @@ jobs:
             VITE_API_AUTH_URL=${{ vars.VITE_API_AUTH_URL || 'https://dev.auth-user.nio.novadrivingone.net' }}
             VITE_API_NOVA_IN_OUT_URL=${{ vars.VITE_API_NOVA_IN_OUT_URL || 'https://dev.api.nio.novadrivingone.net' }}
             VITE_ENABLE_SCREENSHOT_DELETE=${{ vars.VITE_ENABLE_SCREENSHOT_DELETE || 'true' }}
-            VITE_DEV_ACTIVITY_BOT=${{ vars.VITE_DEV_ACTIVITY_BOT || 'false' }}
+            VITE_DEV_ACTIVITY_BOT=${{ vars.VITE_DEV_ACTIVITY_BOT || 'true' }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
           tags: |

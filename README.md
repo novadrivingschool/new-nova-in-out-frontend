@@ -23,7 +23,7 @@ El servidor **no compila nada**: descarga la imagen (nginx + estáticos) desde G
 > (`VITE_API_AUTH_URL`, `VITE_API_NOVA_IN_OUT_URL`, `VITE_ENABLE_SCREENSHOT_DELETE`, `VITE_DEV_ACTIVITY_BOT`) y publicar una versión nueva.
 > El `.env` local **no** entra a la imagen (`.dockerignore`).
 > `VITE_ENABLE_SCREENSHOT_DELETE` es solo dev (muestra el botón de borrar screenshots); ponerlo en `false` en producción.
-> `VITE_DEV_ACTIVITY_BOT` es solo dev/pruebas: muestra el switch del bot de actividad en la edición de usuario, solo a super admins (requiere `DEV_ACTIVITY_BOT=true` en el API). En local va en `.env` (sección DEV ONLY); en la imagen, en la variable de GitHub del mismo nombre (si no existe queda en `false`). Ponerlo en `false` en producción.
+> `VITE_DEV_ACTIVITY_BOT` es solo dev/pruebas: muestra el switch del bot de actividad en la edición de usuario, solo a super admins (requiere `DEV_ACTIVITY_BOT=true` en el API). En local va en `.env` (sección DEV ONLY); en la imagen sale en `true` por defecto, igual que `VITE_ENABLE_SCREENSHOT_DELETE` (lo fija el workflow, no el `.env`). En producción: variable de GitHub del mismo nombre en `false`.
 
 > El servidor usa **docker-compose v1** (`docker-compose`, con guion). Atajo para cada sesión:
 >

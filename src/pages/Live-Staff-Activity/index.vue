@@ -168,6 +168,21 @@
               />
             </template>
           </v-tooltip>
+          <v-tooltip :text="`Test connection with ${item.fullName} (animation only, no screenshot)`" location="top">
+            <template #activator="{ props: tip }">
+              <v-btn
+                v-bind="tip"
+                icon="mdi-access-point"
+                size="small"
+                variant="text"
+                color="primary"
+                :aria-label="`Ping ${item.fullName}`"
+                :disabled="!item.online || !item.userId"
+                :loading="loading.pingId === item.rowKey"
+                @click="pingUser(item)"
+              />
+            </template>
+          </v-tooltip>
           <v-tooltip :text="`Request screenshot + activity from ${item.fullName}`" location="top">
             <template #activator="{ props: tip }">
               <v-btn
@@ -210,7 +225,7 @@ import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { http, ensureFreshAccessToken } from '@/lib/http'
 import { useResponsive } from '@/composables/useResponsive'
 import { useAdminSocket } from '@/composables/useAdminSocket'
-import type { HandshakeView } from '@/types/handshake'
+import type { HandshakeView, PingResult } from '@/types/handshake'
 import HandshakeDialog from '@/components/LiveActivity/HandshakeDialog.vue'
 import HandshakeHistory from '@/components/LiveActivity/HandshakeHistory.vue'
 import AdminClockOutHistory from '@/components/LiveActivity/AdminClockOutHistory.vue'
@@ -258,7 +273,7 @@ const REFRESH_MS = 20_000
 
 const { btnSize } = useResponsive()
 
-const loading = reactive({ devices: false, helloId: null as string | null })
+const loading = reactive({ devices: false, helloId: null as string | null, pingId: null as string | null })
 const lastError = ref('')
 const snackbar = reactive({ show: false, text: '', color: 'success' })
 
@@ -546,6 +561,24 @@ async function startHandshake(item: { rowKey: string; userId: string }): Promise
     notify(messageForError(error), 'error')
   } finally {
     loading.helloId = null
+  }
+}
+
+/** Prueba de conexión: el NIO del usuario muestra una animación y confirma; no toma captura. */
+async function pingUser(item: { rowKey: string; userId: string; fullName?: string }): Promise<void> {
+  if (!item.userId || loading.pingId) return
+  loading.pingId = item.rowKey
+  try {
+    const res = await withAuthRetry(
+      () => http.post<PingResult>('/handshakes/ping', { targetUserId: item.userId }),
+      'POST /handshakes/ping',
+    )
+    notify(`${item.fullName ?? 'User'}: connection OK · ${res.data.rttMs} ms`)
+  } catch (error) {
+    console.error('[ping] error:', error)
+    notify(messageForError(error), 'error')
+  } finally {
+    loading.pingId = null
   }
 }
 

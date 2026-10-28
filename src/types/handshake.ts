@@ -12,6 +12,15 @@ export interface HandshakeActivity {
   [key: string]: unknown
 }
 
+/** Respuesta de POST /handshakes/ping (prueba de conexión, sin captura). */
+export interface PingResult {
+  ok: boolean
+  pingId: string
+  targetUserId: string
+  deviceId: string
+  rttMs: number
+}
+
 /** Vista de un handshake tal como la devuelve el backend. */
 export interface HandshakeView {
   id: string

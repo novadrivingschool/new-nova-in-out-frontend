@@ -96,6 +96,8 @@ export interface UserProfile {
   activity_linked?: boolean;
   /** SOLO dev/pruebas: muestra el bot de actividad en la app NIO del usuario (switch solo para super_admin). */
   dev_activity_bot?: boolean;
+  /** Abre la ventana de DevTools en la app NIO del usuario, en tiempo real (switch para super_admin y admin). */
+  devtools_enabled?: boolean;
   userName?: string;
 }
 

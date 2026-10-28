@@ -213,6 +213,28 @@
         </div>
       </v-card>
 
+      <!-- ═══ Diagnostics: DevTools de la app NIO (prod y dev), solo super admin, solo en edición ═══ -->
+      <v-card v-if="isEditing && canManageDevtools" class="mb-4">
+        <div class="user-info__section-head">
+          <span class="app-eyebrow">Diagnostics</span>
+        </div>
+        <v-divider />
+        <div class="user-info__section-body">
+          <v-switch
+            v-model="formData.profile.devtools_enabled"
+            label="Open DevTools window in this user's NIO app (real time)"
+            color="warning"
+            inset
+            hide-details="auto"
+          />
+          <p class="text-caption text-medium-emphasis mt-2 mb-0">
+            Works in production and development builds. The window opens in the user's NIO app as soon as you
+            save, and closes when you turn it off. DevTools exposes the session of that computer: turn it off when
+            you finish. Admins only.
+          </p>
+        </div>
+      </v-card>
+
       <!-- ═══ Testing tools: solo dev/test, solo super admin, solo en edición ═══ -->
       <v-card v-if="isEditing && canManageDevBot" class="mb-4">
         <div class="user-info__section-head">
@@ -410,6 +432,14 @@ const canManageDevBot = computed(
     !!auth.user?.roles?.includes(Role.SUPER_ADMIN),
 )
 
+/**
+ * Switch de DevTools de la app NIO (también en producción): visible para super_admin y admin.
+ * El candado real está en el backend (403).
+ */
+const canManageDevtools = computed(
+  () => !!auth.user?.roles?.some((r) => r === Role.SUPER_ADMIN || r === Role.ADMIN),
+)
+
 const formRef = ref<any>(null)
 const isFormValid = ref(false)
 const isEditing = ref(false)
@@ -454,6 +484,8 @@ function snapshot(user: UserResponse) {
       activity_linked: user.profile?.activity_linked ?? false,
       // Sin default: si el valor no cambia, buildPayload() no lo envía (el backend solo lo acepta de super_admin).
       dev_activity_bot: user.profile?.dev_activity_bot,
+      // Igual: sin default, solo se envía si el super_admin lo cambia.
+      devtools_enabled: user.profile?.devtools_enabled,
     } as UpdateUserProfileDto,
   }
 }

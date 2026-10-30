@@ -24,6 +24,7 @@
         <span class="live__status">
           <span class="live__dot" :class="{ 'live__dot--idle': !activeCount }" />
           {{ activeCount }} active {{ activeCount === 1 ? 'session' : 'sessions' }}
+          <span v-if="lunchCount" class="live__lunch">· {{ lunchCount }} on lunch</span>
           <span v-if="noConnectionCount" class="live__warn">· {{ noConnectionCount }} without connection</span>
           <span v-if="outOfSyncCount" class="live__warn">· {{ outOfSyncCount }} out of sync</span>
           <span v-if="offlineCount" class="live__muted">· {{ offlineCount }} offline</span>
@@ -70,10 +71,11 @@
             <div class="d-flex align-center ga-2">
               <span
                 class="live__badge"
-                :class="item.status === 'Active' ? 'live__badge--on' : item.status === 'Offline' ? 'live__badge--off' : 'live__badge--warn'"
+                :class="item.status === 'Active' ? 'live__badge--on' : item.status === 'Offline' ? 'live__badge--off' : item.status === 'Lunch' ? 'live__badge--lunch' : 'live__badge--warn'"
                 :title="item.statusDetail"
               >
                 <span class="live__badge-dot" />
+                <v-icon v-if="item.status === 'Lunch'" size="14" class="me-1">mdi-food</v-icon>
                 {{ item.status }}
               </span>
               <v-chip
@@ -168,7 +170,7 @@
               />
             </template>
           </v-tooltip>
-          <v-tooltip :text="`Test connection with ${item.fullName} (animation only, no screenshot)`" location="top">
+          <v-tooltip :text="item.onLunch ? `${item.fullName} is on lunch` : `Test connection with ${item.fullName} (animation only, no screenshot)`" location="top">
             <template #activator="{ props: tip }">
               <v-btn
                 v-bind="tip"
@@ -177,13 +179,13 @@
                 variant="text"
                 color="primary"
                 :aria-label="`Ping ${item.fullName}`"
-                :disabled="!item.online || !item.userId"
+                :disabled="!item.online || !item.userId || item.onLunch"
                 :loading="loading.pingId === item.rowKey"
                 @click="pingUser(item)"
               />
             </template>
           </v-tooltip>
-          <v-tooltip :text="`Request screenshot + activity from ${item.fullName}`" location="top">
+          <v-tooltip :text="item.onLunch ? `${item.fullName} is on lunch` : `Request screenshot + activity from ${item.fullName}`" location="top">
             <template #activator="{ props: tip }">
               <v-btn
                 v-bind="tip"
@@ -192,7 +194,7 @@
                 variant="text"
                 color="primary"
                 :aria-label="`Handshake with ${item.fullName}`"
-                :disabled="!item.online || !item.userId"
+                :disabled="!item.online || !item.userId || item.onLunch"
                 :loading="loading.helloId === item.rowKey"
                 @click="startHandshake(item)"
               />
@@ -266,6 +268,8 @@ interface DeviceRecord {
   online?: boolean
   /** Hay un socket registrado (con o sin turno). */
   connected?: boolean
+  /** La app NIO informa que el turno está en lunch (socket conectado, sin monitoreo). */
+  onLunch?: boolean
 }
 
 /** El listado es un monitor en vivo: se refresca solo. */
@@ -292,6 +296,8 @@ const devices = ref<DeviceRecord[]>([])
 const clockIns = ref<Record<string, string>>({})
 /** employee_numbers con el Activity Report abierto hoy. null = no se pudo consultar. */
 const arOpen = ref<Set<string> | null>(null)
+/** employee_numbers con lunch abierto en el Activity (respaldo si el socket no informó el lunch). */
+const lunchOpen = ref<Set<string>>(new Set())
 /** Clock outs hechos por admin, por employee_number (historial independiente del handshake). */
 const adminCounts = ref<Record<string, number>>({})
 const adminHistoryRefresh = ref(0)
@@ -347,9 +353,13 @@ const allRows = computed(() =>
       return { name, text: 'Clocked out', color: undefined, icon: 'mdi-circle-outline', title: `${name}: clocked out` }
     }
     const sides = [sideOf('NIO', nioOpen), sideOf('Activity', arIsOpen, arKnown)]
-    const status: 'Active' | 'No connection' | 'Out of sync' | 'Offline' = outOfSync
+    // Lunch solo existe en modo NIO + AR: el socket lo informa; el Activity lo confirma.
+    const onLunch = linked && hasOpenSession && (device.onLunch === true || !!(empNumber && lunchOpen.value.has(empNumber)))
+    const status: 'Active' | 'No connection' | 'Out of sync' | 'Offline' | 'Lunch' = outOfSync
       ? 'Out of sync'
-      : online
+      : onLunch
+        ? 'Lunch'
+        : online
         ? 'Active'
         : hasOpenSession
           ? 'No connection'
@@ -357,7 +367,7 @@ const allRows = computed(() =>
     const statusDetail = [
       `Mode: ${linked ? 'NIO + AR' : 'NIO only'}`,
       `Socket: ${connected ? 'connected' : 'disconnected'}${connected ? (online ? ' (on shift)' : ' (off shift)') : ''}`,
-      `NIO shift: ${nioOpen ? 'open' : 'closed'}`,
+      `NIO shift: ${nioOpen ? (onLunch ? 'open (lunch)' : 'open') : 'closed'}`,
       ...(linked ? [`AR shift: ${arKnown ? (arIsOpen ? 'open' : 'closed') : 'unknown'}`] : []),
     ].join(' · ')
 
@@ -385,6 +395,7 @@ const allRows = computed(() =>
       fullName,
       initials,
       online,
+      onLunch,
       connected,
       linked,
       mode: linked ? 'NIO + AR' : 'NIO',
@@ -403,10 +414,11 @@ const allRows = computed(() =>
 )
 
 const activeCount = computed(() => allRows.value.filter((r) => r.status === 'Active').length)
+const lunchCount = computed(() => allRows.value.filter((r) => r.status === 'Lunch').length)
 const noConnectionCount = computed(() => allRows.value.filter((r) => r.status === 'No connection').length)
 const outOfSyncCount = computed(() => allRows.value.filter((r) => r.status === 'Out of sync').length)
 const offlineCount = computed(
-  () => allRows.value.length - activeCount.value - noConnectionCount.value - outOfSyncCount.value,
+  () => allRows.value.length - activeCount.value - lunchCount.value - noConnectionCount.value - outOfSyncCount.value,
 )
 /** Por defecto: activos + turnos abiertos sin conexión (para poder hacerles clock out). */
 const rows = computed(() =>
@@ -477,7 +489,8 @@ async function loadDevices(): Promise<void> {
         return null
       }),
     ])
-    arOpen.value = Array.isArray(arOpenList) ? new Set(arOpenList) : null
+    arOpen.value = arOpenList ? new Set(arOpenList.open) : null
+    lunchOpen.value = new Set(arOpenList?.lunch ?? [])
     adminCounts.value = counts ?? {}
     user.value = response.data?.user ?? null
     devices.value = Array.isArray(response.data?.devices)
@@ -687,6 +700,20 @@ onUnmounted(() => {
 }
 
 .live__badge--warn .live__badge-dot {
+  background: rgb(var(--v-theme-warning));
+  opacity: 1;
+}
+
+.live__lunch {
+  font-weight: 500;
+  color: rgb(var(--v-theme-warning));
+}
+
+.live__badge--lunch {
+  color: rgb(var(--v-theme-warning));
+}
+
+.live__badge--lunch .live__badge-dot {
   background: rgb(var(--v-theme-warning));
   opacity: 1;
 }

@@ -47,7 +47,17 @@
           label="Total worked"
           :value="formatDuration(stats.totalSeconds)"
           :hint="`${stats.sessions.length} ${stats.sessions.length === 1 ? 'sesión' : 'sesiones'}`"
-          info="Tiempo entre cada clock in y su clock out. Una sesión sin clock out cuenta hasta el último registro del rango."
+          info="Tiempo entre cada clock in y su clock out, ya sin el lunch. Una sesión sin clock out cuenta hasta el último registro del rango."
+        />
+        <StatCard
+          label="Lunch"
+          :value="formatDuration(stats.lunchSeconds)"
+          :hint="
+            stats.lunches.length
+              ? `${stats.lunches.length} ${stats.lunches.length === 1 ? 'lunch' : 'lunches'}`
+              : 'Sin lunch en este rango'
+          "
+          info="Tiempo entre Go to lunch y Back to lunch. Se descuenta de las horas trabajadas y no entra al cálculo del performance."
         />
         <StatCard
           label="Active time"
@@ -64,7 +74,7 @@
           :tone="rating?.color"
           :badge="rating?.label"
           :hint="performanceHint"
-          info="Tiempo activo entre el tiempo capturable (la suma del intervalo de cada captura). Es el mismo cálculo de la barra de cada captura, sumado."
+          info="Tiempo activo entre el tiempo capturable (la suma del intervalo de cada captura). Es el mismo cálculo de la barra de cada captura, sumado. El lunch no entra al cálculo."
         />
         <StatCard
           label="Connection"
@@ -119,6 +129,7 @@
             <tr>
               <th>Date</th>
               <th class="text-right">Worked</th>
+              <th class="text-right">Lunch</th>
               <th class="text-right">Active</th>
               <th class="daily__perf-col">Performance</th>
             </tr>
@@ -128,6 +139,9 @@
               <td>{{ formatDisplayDate(day.date) }}</td>
               <td class="tabular text-right history__duration">
                 {{ formatDuration(day.totalSeconds) }}
+              </td>
+              <td class="tabular text-right">
+                {{ day.lunchSeconds ? formatDuration(day.lunchSeconds) : '—' }}
               </td>
               <td class="tabular text-right">
                 {{ formatDuration(day.activeSeconds) }}
@@ -168,6 +182,7 @@
               <th>Date</th>
               <th>Clock in</th>
               <th>Clock out</th>
+              <th class="text-right">Lunch</th>
               <th class="text-right">Duration</th>
             </tr>
           </thead>
@@ -197,6 +212,9 @@
                     Admin · {{ adminReasonLabel(session.adminReason) }}
                   </v-chip>
                 </template>
+              </td>
+              <td class="tabular text-right">
+                {{ session.lunchSeconds ? formatDuration(session.lunchSeconds) : '—' }}
               </td>
               <td class="tabular text-right history__duration">
                 {{ formatDuration(session.durationSeconds) }}

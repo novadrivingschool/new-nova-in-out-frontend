@@ -17,7 +17,7 @@
       key="activity-during-the-day"
       title="Activity during the day"
       subtitle="Rendimiento de cada captura"
-      info="Cada barra es una captura del día, coloreada según su rendimiento. Las barras moradas y negras son capturas sin conexión (sin internet / offline): la app sí mide la actividad aunque no haya red, y se envía al reconectar. Una línea punteada vertical marca una captura con 0% de actividad, del color de su estado (rojo si sí había conexión)."
+      info="Cada barra es una captura del día, coloreada según su rendimiento. Las barras moradas y negras son capturas sin conexión (sin internet / offline): la app sí mide la actividad aunque no haya red, y se envía al reconectar. Una línea punteada vertical marca una captura con 0% de actividad, del color de su estado (rojo si sí había conexión). La franja ámbar marca el lunch (de Go to lunch al siguiente registro): no entra al cálculo del performance."
       :empty="!stats.timeline.length"
       empty-title="No captures"
       empty-description="No hay capturas en este día."
@@ -32,6 +32,9 @@
       <ul class="charts__legend" aria-label="Significado de los colores">
         <li v-for="item in tierLegend" :key="item.label">
           <span class="dot" :style="{ background: item.color }" /> {{ item.label }}
+        </li>
+        <li v-if="stats.lunches.length">
+          <span class="dot" :style="{ background: lunchColor }" /> Lunch · Go to lunch → Back to lunch (no cuenta en el performance)
         </li>
         <li v-for="item in connectionLegend" :key="item.label">
           <span class="dot" :style="{ background: item.color }" />
@@ -197,6 +200,7 @@ import { useResponsive } from '@/composables/useResponsive'
 import { mergeOptions, useChartTheme } from '@/composables/useChartTheme'
 import { formatHour, formatShortDate, roundTo } from '@/utils/chartFormat'
 import { statusLabel } from './screenshotFormat'
+import { chicagoDate, chicagoTime } from '@/utils/clockSession'
 import type { ScreenshotStats } from './screenshotStats'
 
 const props = defineProps<{ stats: ScreenshotStats; multiDay?: boolean }>()
@@ -383,6 +387,8 @@ const tierLegend = computed(() => [
   { label: 'Bueno / Excelente · 75–100%', color: token('perf-high') },
 ])
 
+const lunchColor = computed(() => token('warning'))
+
 /** Estados sin conexión que aparecen en el día; cada línea o barra respeta su tipo y color. */
 const connectionLegend = computed(() => {
   const seen = new Set<string>()
@@ -390,10 +396,137 @@ const connectionLegend = computed(() => {
   return [...seen].map((status) => ({ label: statusName(status), color: statusColorOf(status) }))
 })
 
+type TimelineSlot =
+  | { kind: 'capture'; point: (typeof props.stats.timeline)[number] }
+  /** Tiempo transcurrido sin capturas todavía (turno abierto, hasta la hora actual). */
+  | { kind: 'idle'; time: string }
+  | {
+      kind: 'lunch'
+      /** Hora aproximada de esta posición (HH:MM). */
+      time: string
+      /** Lunch al que pertenece (orden del día) y su rol en el rango. */
+      lunchIdx: number
+      part: 'start' | 'middle' | 'end'
+      text: string
+    }
+
+/** Día único de hoy con el turno abierto (ahí la escala se extiende hasta la hora actual). */
+const isViewingToday = computed(
+  () =>
+    !props.multiDay &&
+    props.stats.days.length === 1 &&
+    props.stats.days[0].date === chicagoDate() &&
+    props.stats.sessions.some((x) => x.open),
+)
+
+const toMin = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number)
+  return (h || 0) * 60 + (m || 0)
+}
+const fromMin = (min: number): string => {
+  const t = ((Math.round(min) % 1440) + 1440) % 1440
+  return `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`
+}
+
+/** Separación típica entre capturas (min): mediana de las separaciones normales del día. */
+const captureStepMin = computed(() => {
+  const mins = props.stats.timeline.map((p) => toMin(p.time))
+  const diffs: number[] = []
+  for (let i = 1; i < mins.length; i++) {
+    const d = mins[i] - mins[i - 1]
+    if (d >= 1 && d <= 15) diffs.push(d)
+  }
+  if (!diffs.length) return 5
+  diffs.sort((x, y) => x - y)
+  return diffs[Math.floor(diffs.length / 2)]
+})
+
+/**
+ * Posiciones de la gráfica: cada captura ocupa una y cada lunch ocupa tantas posiciones VACÍAS como
+ * capturas habría cabido en su duración (mín. 1, máx. 40), justo después de su captura de Go to lunch.
+ * El rango del lunch se ve así con su tamaño real y sin barras (no hay actividad); la barra de
+ * Go to lunch queda fuera: es el último tramo medido antes de salir.
+ */
+const timelineSlots = computed<TimelineSlot[]>(() => {
+  const points = props.stats.timeline
+  const lunchesAfter = new Map<number, TimelineSlot[]>()
+  props.stats.lunches.forEach((lunch, lunchIdx) => {
+    // Captura del Go to lunch = la ÚLTIMA captura a esa hora o antes (varias pueden compartir minuto).
+    let idx = -1
+    points.forEach((p, i) => {
+      if (p.time <= lunch.start) idx = i
+    })
+    const nowMin = isViewingToday.value ? toMin(chicagoTime().slice(0, 5)) : 0
+    // Un lunch en curso se mide hasta ahora (el registro solo llega hasta el Go to lunch).
+    const mins = Math.max(1, Math.round(lunch.seconds / 60), lunch.end === null ? nowMin - toMin(lunch.start) : 0)
+    const dur = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`
+    const text = `Go to lunch ${lunch.start} → ${lunch.end ? `Back to lunch ${lunch.end}` : 'in progress'} · ${dur}${lunch.closedByAdmin ? ' · back by admin (force clock out)' : ''}`
+    const n = Math.min(40, Math.max(1, Math.round(mins / captureStepMin.value)))
+    const startMin = toMin(lunch.start)
+    const slots: TimelineSlot[] = []
+    for (let k = 0; k < n; k++) {
+      slots.push({
+        kind: 'lunch',
+        time: fromMin(startMin + (k * mins) / n),
+        lunchIdx,
+        part: k === 0 ? 'start' : k === n - 1 ? 'end' : 'middle',
+        text,
+      })
+    }
+    lunchesAfter.set(idx, [...(lunchesAfter.get(idx) ?? []), ...slots])
+  })
+  const slots: TimelineSlot[] = [...(lunchesAfter.get(-1) ?? [])]
+  points.forEach((point, i) => {
+    slots.push({ kind: 'capture', point }, ...(lunchesAfter.get(i) ?? []))
+  })
+  // Turno abierto hoy: la escala llega hasta la hora actual (posiciones vacías tras la última marca).
+  if (isViewingToday.value && slots.length) {
+    let lastMin = 0
+    for (const slot of slots) {
+      const t = toMin(slot.kind === 'capture' ? slot.point.time : slot.time)
+      if (t > lastMin) lastMin = t
+    }
+    for (const lunch of props.stats.lunches) {
+      if (lunch.end) lastMin = Math.max(lastMin, toMin(lunch.end))
+    }
+    const nowMin = toMin(chicagoTime().slice(0, 5))
+    const extra = Math.min(40, Math.floor((nowMin - lastMin) / captureStepMin.value))
+    for (let k = 1; k <= extra; k++) slots.push({ kind: 'idle', time: fromMin(lastMin + k * captureStepMin.value) })
+  }
+  return slots
+})
+
+/** Posiciones (primera y última) de cada lunch en `timelineSlots`. */
+const lunchSpans = computed(() => {
+  const spans = new Map<number, { first: number; last: number }>()
+  timelineSlots.value.forEach((slot, i) => {
+    if (slot.kind !== 'lunch') return
+    const span = spans.get(slot.lunchIdx)
+    if (span) span.last = i
+    else spans.set(slot.lunchIdx, { first: i, last: i })
+  })
+  return [...spans.values()]
+})
+
+/** Franja ámbar por lunch, de su Go to lunch a su Back to lunch. */
+const lunchBands = computed(() =>
+  lunchSpans.value.map((span, n) => ({
+    x: span.first - 0.5,
+    x2: span.last + 0.5,
+    fillColor: token('warning'),
+    // Alterna la opacidad: lunches seguidos se distinguen.
+    opacity: n % 2 === 0 ? 0.22 : 0.36,
+    borderColor: token('warning'),
+  })),
+)
 const timelineSeries = computed(() => [
   {
     name: 'Performance',
-    data: props.stats.timeline.map((p) => p.performance),
+    // Los lunches son posiciones sin barra (y: 0 no dibuja nada y mantiene el tooltip): ahí no hay actividad.
+    data: timelineSlots.value.map((slot, i) => ({
+      x: i,
+      y: slot.kind === 'capture' ? slot.point.performance : 0,
+    })),
   },
 ])
 
@@ -404,42 +537,53 @@ function zeroColor(point: { connected: boolean; status: string }): string {
 }
 
 /** Línea punteada vertical en cada captura con 0% de actividad (su barra no se vería). */
-const zeroLines = computed(() =>
-  props.stats.timeline
-    .filter((p) => p.performance === 0)
-    .map((p) => ({
-      x: p.time,
-      borderColor: zeroColor(p),
-      borderWidth: 2,
-      strokeDashArray: 4,
-      opacity: 1,
-    })),
-)
+const zeroLines = computed(() => {
+  const lines: Array<Record<string, unknown>> = []
+  timelineSlots.value.forEach((slot, i) => {
+    if (slot.kind !== 'capture' || slot.point.performance !== 0) return
+    lines.push({ x: i, borderColor: zeroColor(slot.point), borderWidth: 2, strokeDashArray: 4, opacity: 1 })
+  })
+  return lines
+})
 
-/** Color de la barra (y del punto del tooltip) de cada captura: su estado o su tramo. */
+/** Color de la barra (y del punto del tooltip) de cada posición: su estado, su tramo o el del lunch. */
 function timelinePointColor(index: number): string {
-  const point = props.stats.timeline[index]
-  if (!point) return token('on-surface-variant')
-  if (point.connected) return tierColor(point.performance)
-  return statusColorOf(point.status)
+  const slot = timelineSlots.value[index]
+  if (!slot) return token('on-surface-variant')
+  if (slot.kind === 'lunch') return token('warning')
+  if (slot.kind === 'idle') return token('on-surface-variant')
+  if (slot.point.connected) return tierColor(slot.point.performance)
+  return statusColorOf(slot.point.status)
 }
 
 const escapeHtml = (text: string): string =>
   text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
-/** Texto del tooltip: porcentaje y, si aplica, estado sin conexión y falta de actividad. */
-function timelineTooltipText(index: number): string {
-  const point = props.stats.timeline[index]
-  if (!point) return ''
+const lunchStarts = computed(() => new Set(props.stats.lunches.map((l) => l.start)))
+
+/** Texto del tooltip de una captura: porcentaje y, si aplica, estado sin conexión y falta de actividad. */
+function timelineTooltipText(point: { time: string; performance: number; connected: boolean; status: string }): string {
   const notes: string[] = []
   if (!point.connected) notes.push(statusName(point.status))
   if (point.performance === 0) notes.push('sin actividad')
+  if (lunchStarts.value.has(point.time)) notes.push('Go to lunch (último tramo antes de salir)')
   return notes.length ? `${point.performance}% · ${notes.join(' · ')}` : `${point.performance}%`
+}
+
+function tooltipRow(color: string, label: string, value: string): string {
+  return (
+    '<div class="apexcharts-tooltip-series-group apexcharts-active" style="display: flex">' +
+    `<span class="apexcharts-tooltip-marker" style="background-color: ${color}"></span>` +
+    '<div class="apexcharts-tooltip-text"><div class="apexcharts-tooltip-y-group">' +
+    `<span class="apexcharts-tooltip-text-y-label">${label}: </span>` +
+    `<span class="apexcharts-tooltip-text-y-value">${escapeHtml(value)}</span>` +
+    '</div></div></div>'
+  )
 }
 
 const timelineOptions = computed(() =>
   mergeOptions(baseOptions.value, {
-    annotations: { xaxis: zeroLines.value },
+    annotations: { xaxis: [...lunchBands.value, ...zeroLines.value] },
     colors: [
       ({ dataPointIndex }: { dataPointIndex: number }) => timelinePointColor(dataPointIndex),
     ],
@@ -452,9 +596,23 @@ const timelineOptions = computed(() =>
       },
     },
     xaxis: {
-      categories: props.stats.timeline.map((p) => p.time),
-      tickAmount: smAndDown.value ? 5 : 12,
-      labels: { rotate: 0, hideOverlappingLabels: true },
+      // Índice de captura (numérico) con la hora como etiqueta: así las franjas y líneas se anclan
+      // a cualquier captura, no solo a las que tienen etiqueta visible en el eje.
+      type: 'numeric',
+      min: -0.5,
+      max: Math.max(timelineSlots.value.length - 0.5, 0.5),
+      tickAmount: Math.max(1, Math.min(smAndDown.value ? 5 : 12, timelineSlots.value.length - 1)),
+      decimalsInFloat: 0,
+      labels: {
+        rotate: 0,
+        hideOverlappingLabels: true,
+        formatter: (value: string | number) => {
+          const slots = timelineSlots.value
+          const idx = Math.min(slots.length - 1, Math.max(0, Math.round(Number(value))))
+          const slot = slots[idx]
+          return slot ? (slot.kind === 'capture' ? slot.point.time : slot.time) : ''
+        },
+      },
       // Guía vertical que sigue al puntero, junto con el tooltip.
       crosshairs: { show: true, stroke: { color: colors.value.neutral, width: 1, dashArray: 0 } },
       tooltip: { enabled: false },
@@ -472,16 +630,24 @@ const timelineOptions = computed(() =>
       shared: true,
       intersect: false,
       custom: ({ dataPointIndex }: { dataPointIndex: number }) => {
-        const point = props.stats.timeline[dataPointIndex]
-        if (!point) return ''
+        const slot = timelineSlots.value[dataPointIndex]
+        if (!slot) return ''
+        if (slot.kind === 'idle') {
+          return `<div class="apexcharts-tooltip-title">${escapeHtml(slot.time)}</div>` + tooltipRow(token('on-surface-variant'), 'Capture', 'pending (next capture not yet taken)')
+        }
+        if (slot.kind === 'lunch') {
+          const lunch = props.stats.lunches[slot.lunchIdx]
+          const [label, value] =
+            slot.part === 'start'
+              ? ['Go to lunch', slot.text]
+              : slot.part === 'end'
+                ? [lunch?.end ? 'Back to lunch' : 'Lunch', slot.text]
+                : ['Lunch', slot.text]
+          return `<div class="apexcharts-tooltip-title">${escapeHtml(slot.time)}</div>` + tooltipRow(token('warning'), label, value)
+        }
         return (
-          `<div class="apexcharts-tooltip-title">${escapeHtml(point.time)}</div>` +
-          '<div class="apexcharts-tooltip-series-group apexcharts-active" style="display: flex">' +
-          `<span class="apexcharts-tooltip-marker" style="background-color: ${timelinePointColor(dataPointIndex)}"></span>` +
-          '<div class="apexcharts-tooltip-text"><div class="apexcharts-tooltip-y-group">' +
-          '<span class="apexcharts-tooltip-text-y-label">Performance: </span>' +
-          `<span class="apexcharts-tooltip-text-y-value">${escapeHtml(timelineTooltipText(dataPointIndex))}</span>` +
-          '</div></div></div>'
+          `<div class="apexcharts-tooltip-title">${escapeHtml(slot.point.time)}</div>` +
+          tooltipRow(timelinePointColor(dataPointIndex), 'Performance', timelineTooltipText(slot.point))
         )
       },
     },

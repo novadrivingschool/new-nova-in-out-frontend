@@ -26,7 +26,10 @@
         <span class="ar-employee">{{ fullName }}</span>
 
         <!-- Informativo: solo texto con punto de color, sin relleno (no se confunde con un botón) -->
-        <div class="ar-info" role="status" aria-live="polite">
+        <div v-if="!ready" class="ar-info" aria-hidden="true">
+          <v-skeleton-loader v-for="w in [150, 130, 90, 120]" :key="w" type="text" :width="w" class="ar-skel-text" />
+        </div>
+        <div v-else class="ar-info" role="status" aria-live="polite">
           <span class="ar-stat" :class="activityIn ? 'ar-stat--ok' : outOfSync ? 'ar-stat--warn' : ''">
             <i class="ar-stat__dot" />Activity: {{ activityIn ? (lunchOpen ? 'On lunch' : 'Clocked In') : 'Clocked Out' }}
           </span>
@@ -92,6 +95,27 @@
       </div>
     </v-card>
 
+    <!-- Carga inicial: esqueleto con la misma estructura hasta que terminan de llegar los estados -->
+    <div v-if="!ready" role="status" aria-live="polite" aria-busy="true">
+      <span class="ar-sr-only">Loading Activity Report…</span>
+      <v-card class="pa-5 mb-4">
+        <div class="d-flex flex-wrap align-start ga-6">
+          <v-skeleton-loader type="heading" width="360" class="ar-skel-field" />
+          <div class="d-flex flex-wrap justify-center ga-4 flex-grow-1">
+            <v-skeleton-loader v-for="n in 2" :key="n" type="image" width="180" height="150" class="ar-skel-action" />
+          </div>
+        </div>
+      </v-card>
+      <v-row>
+        <v-col v-for="n in 2" :key="n" cols="12" md="6">
+          <v-card class="pa-4 h-100">
+            <v-skeleton-loader type="heading, text, list-item-two-line@3" />
+          </v-card>
+        </v-col>
+      </v-row>
+    </div>
+
+    <template v-else>
     <!-- Acciones -->
     <v-card class="pa-5 mb-4">
       <div class="d-flex flex-wrap align-start ga-6">
@@ -129,67 +153,107 @@
                   size="76"
                   width="5"
                   color="success"
-                  :aria-label="`Wait ${{ cooldownLeft }} seconds`"
+                  :aria-label="`Wait ${cooldownLeft} seconds`"
                 >
                   <span class="ar-action-wait">{{ cooldownLeft }}s</span>
                 </v-progress-circular>
-                <span v-else class="ar-action-timer">{{ sessionTime }}</span>
+                <span v-else class="ar-action-stack">
+                  <ArActionIcon name="in" :size="44" />
+                  <span class="ar-action-timer">{{ sessionTime }}</span>
+                </span>
               </div>
               <div class="ar-action-label">CLOCK IN</div>
             </div>
-            <div
-              v-else
-              class="ar-action ar-action--out"
-              :class="{ 'ar-action--disabled': !canClock || lunchOpen }"
-              role="button"
-              :tabindex="canClock && !lunchOpen ? 0 : -1"
-              :aria-disabled="!canClock || lunchOpen"
-              @click="askClockOut"
-              @keyup.enter="askClockOut"
-            >
-              <div class="ar-action-center">
-                <v-progress-circular v-if="busy === 'CLOCK_OUT'" indeterminate size="48" color="error" />
-                <v-progress-circular
-                  v-else-if="cooling"
-                  :model-value="(cooldownLeft / COOLDOWN_SEC) * 100"
-                  size="76"
-                  width="5"
-                  color="error"
-                  :aria-label="`Wait ${{ cooldownLeft }} seconds`"
-                >
-                  <span class="ar-action-wait">{{ cooldownLeft }}s</span>
-                </v-progress-circular>
-                <span v-else class="ar-action-timer">{{ sessionTime }}</span>
-              </div>
-              <div class="ar-action-label">CLOCK OUT</div>
-            </div>
 
-            <div v-if="activityIn" class="d-flex flex-column justify-center ga-2">
-              <v-btn
+            <template v-else>
+              <!-- Con el lunch en curso no se ofrece Clock Out: primero se regresa del lunch -->
+              <div
                 v-if="!lunchOpen"
-                color="warning"
-                variant="flat"
-                size="large"
-                prepend-icon="mdi-food"
-                :disabled="!canLunch"
-                :loading="busy === 'LUNCH_IN'"
-                @click="doLunch('IN')"
+                class="ar-action ar-action--out"
+                :class="{ 'ar-action--disabled': !canClock }"
+                role="button"
+                :tabindex="canClock ? 0 : -1"
+                :aria-disabled="!canClock"
+                @click="askClockOut"
+                @keyup.enter="askClockOut"
               >
-                Lunch In
-              </v-btn>
-              <v-btn
+                <div class="ar-action-center">
+                  <v-progress-circular v-if="busy === 'CLOCK_OUT'" indeterminate size="48" color="error" />
+                  <v-progress-circular
+                    v-else-if="cooling"
+                    :model-value="(cooldownLeft / COOLDOWN_SEC) * 100"
+                    size="76"
+                    width="5"
+                    color="error"
+                    :aria-label="`Wait ${cooldownLeft} seconds`"
+                  >
+                    <span class="ar-action-wait">{{ cooldownLeft }}s</span>
+                  </v-progress-circular>
+                  <span v-else class="ar-action-stack">
+                    <ArActionIcon name="out" :size="44" />
+                    <span class="ar-action-timer">{{ sessionTime }}</span>
+                  </span>
+                </div>
+                <div class="ar-action-label">CLOCK OUT</div>
+              </div>
+
+              <div
+                v-if="!lunchOpen"
+                class="ar-action ar-action--lunch"
+                :class="{ 'ar-action--disabled': !canLunch }"
+                role="button"
+                :tabindex="canLunch ? 0 : -1"
+                :aria-disabled="!canLunch"
+                @click="canLunch && doLunch('IN')"
+                @keyup.enter="canLunch && doLunch('IN')"
+              >
+                <div class="ar-action-center">
+                  <v-progress-circular v-if="busy === 'LUNCH_IN'" indeterminate size="48" color="warning" />
+                  <v-progress-circular
+                    v-else-if="cooling"
+                    :model-value="(cooldownLeft / COOLDOWN_SEC) * 100"
+                    size="76"
+                    width="5"
+                    color="warning"
+                    :aria-label="`Wait ${cooldownLeft} seconds`"
+                  >
+                    <span class="ar-action-wait">{{ cooldownLeft }}s</span>
+                  </v-progress-circular>
+                  <ArActionIcon v-else name="lunch-go" :size="64" />
+                </div>
+                <div class="ar-action-label">GO TO LUNCH</div>
+              </div>
+
+              <div
                 v-else
-                color="success"
-                variant="flat"
-                size="large"
-                prepend-icon="mdi-food-off"
-                :disabled="!canLunch"
-                :loading="busy === 'LUNCH_OUT'"
-                @click="doLunch('OUT')"
+                class="ar-action ar-action--back"
+                :class="{ 'ar-action--disabled': !canLunch }"
+                role="button"
+                :tabindex="canLunch ? 0 : -1"
+                :aria-disabled="!canLunch"
+                @click="canLunch && doLunch('OUT')"
+                @keyup.enter="canLunch && doLunch('OUT')"
               >
-                Lunch Out
-              </v-btn>
-            </div>
+                <div class="ar-action-center">
+                  <v-progress-circular v-if="busy === 'LUNCH_OUT'" indeterminate size="48" color="success" />
+                  <v-progress-circular
+                    v-else-if="cooling"
+                    :model-value="(cooldownLeft / COOLDOWN_SEC) * 100"
+                    size="76"
+                    width="5"
+                    color="success"
+                    :aria-label="`Wait ${cooldownLeft} seconds`"
+                  >
+                    <span class="ar-action-wait">{{ cooldownLeft }}s</span>
+                  </v-progress-circular>
+                  <span v-else class="ar-action-stack">
+                    <ArActionIcon name="lunch-back" :size="44" />
+                    <span class="ar-action-timer" aria-label="Lunch time elapsed">{{ lunchTime }}</span>
+                  </span>
+                </div>
+                <div class="ar-action-label">BACK TO LUNCH</div>
+              </div>
+            </template>
           </div>
           <div v-if="linked && !appConnected" class="text-caption text-error" aria-live="polite">
             Open your NIO app to Clock In / Clock Out here
@@ -197,7 +261,7 @@
           <div v-else-if="linked && localCheck?.checked && !localCheck.ok" class="text-caption text-error" aria-live="polite">
             {{ localCheck.message }}
           </div>
-          <div v-else-if="lunchOpen" class="text-caption text-warning">End your lunch before clocking out</div>
+          <div v-else-if="lunchOpen" class="text-caption text-warning">On lunch · come back to lunch to clock out</div>
           <div v-else-if="cooling" class="ar-sr-only" aria-live="polite">
             Your desktop app is finishing the last clock — wait {{ cooldownLeft }}s
           </div>
@@ -219,12 +283,10 @@
           <v-list v-else density="compact" lines="one" class="pa-0 ar-events">
             <v-list-item v-for="r in nioRows" :key="r.id" class="px-0">
               <template #prepend>
-                <v-icon :color="isIn(r) ? 'success' : 'error'" size="18" class="me-3">
-                  {{ isIn(r) ? 'mdi-login' : 'mdi-logout' }}
-                </v-icon>
+                <v-icon :color="nioColor(r)" size="18" class="me-3">{{ nioIcon(r) }}</v-icon>
               </template>
-              <v-list-item-title :class="isIn(r) ? '' : 'text-error'">
-                {{ isIn(r) ? 'Clock In' : 'Clock Out' }} · {{ r.clock_time }}
+              <v-list-item-title :class="nioKind(r) === 'CLOCK_OUT' ? 'text-error' : ''">
+                {{ nioTitle(r) }} · {{ r.clock_time }}
               </v-list-item-title>
               <template v-if="r.source && r.source !== 'MANUAL'" #append>
                 <v-chip size="x-small" variant="tonal">{{ sourceLabel(r.source) }}</v-chip>
@@ -272,6 +334,7 @@
         </v-card>
       </v-col>
     </v-row>
+    </template>
 
     <!-- Confirmación de Clock Out (frase) -->
     <v-dialog v-model="confirm.show" max-width="480" persistent>
@@ -349,6 +412,7 @@ import NovaInOutServices from '@/services/NovaInOutServices'
 import { useAdminSocket } from '@/composables/useAdminSocket'
 import { remoteClockService } from '@/services/remoteClock.service'
 import { localAppService, type LocalCheck } from '@/services/localApp.service'
+import ArActionIcon from '@/components/ActivityReport/ArActionIcon.vue'
 import { FORCE_CLOCK_OUT_REASON_LABEL } from '@/types/adminClockOut'
 import {
   SELF_CLOCK_OUT_REASONS,
@@ -365,6 +429,7 @@ import {
   chicagoDate,
   chicagoTime,
   clockRowsOf,
+  lifecycleRowsOf,
   hhmmssToSeconds,
   isClockedIn,
   secondsToHHMMSS,
@@ -398,6 +463,8 @@ const status = ref<RemoteClockStatus | null>(null)
 const activity = ref<ActivityDay | null>(null)
 const busy = ref<'CLOCK_IN' | 'CLOCK_OUT' | 'LUNCH_IN' | 'LUNCH_OUT' | 'SYNC' | null>(null)
 const refreshing = ref(false)
+/** false hasta que termina la primera carga de estados: mientras tanto se muestra el esqueleto. */
+const ready = ref(false)
 
 const nowTime = ref(chicagoTime())
 const nowMs = ref(Date.now())
@@ -407,7 +474,8 @@ const today = ref(chicagoDate())
 let tick: ReturnType<typeof setInterval> | null = null
 let poll: ReturnType<typeof setInterval> | null = null
 
-const rows = computed(() => clockRowsOf(records.value))
+// Filas del NIO: CLOCK + lunch (el antirrebote de 15 s también cuenta el último go/back to lunch)
+const rows = computed(() => lifecycleRowsOf(records.value))
 const nioRows = computed(() => [...rows.value].reverse())
 const nioIn = computed(() => isClockedIn(records.value))
 
@@ -456,6 +524,13 @@ const sessionTime = computed(() => {
   return secondsToHHMMSS(Math.max(0, total))
 })
 
+/** Cronómetro del lunch en curso (desde el Go to lunch hasta ahora). */
+const lunchTime = computed(() => {
+  const open = activityEvents.value.find(isLunchOpen)
+  if (!open) return '00:00:00'
+  return secondsToHHMMSS(hhmmssToSeconds(nowTime.value) - hhmmssToSeconds(open.start_time))
+})
+
 /**
  * Segundos de pausa restantes. Toma el mayor de: (a) 15 s desde que la app confirmó el último
  * clock pedido aquí y (b) 15 s desde el último registro NIO del día, que también cubre un clock
@@ -484,9 +559,24 @@ const canClock = computed(
     (!linked.value || (appConnected.value && localOk.value)) &&
     (cooldownLeft.value === 0 || !appConnected.value),
 )
-const canLunch = computed(() => hasExternal.value && busy.value === null)
+// Independiente: lunch propio del Activity, sin NIO. NIO + AR: lo ejecuta la app NIO de este equipo
+// (socket + mismo equipo + mismo usuario) y respeta la pausa de 15 s de su botón.
+const canLunch = computed(
+  () =>
+    hasExternal.value &&
+    busy.value === null &&
+    (!linked.value ||
+      (appConnected.value && localOk.value && (cooldownLeft.value === 0 || !appConnected.value))),
+)
 
 const isIn = (r: ClockRecord) => String(r.type_of_clock).toUpperCase() === 'CLOCK_IN'
+const nioKind = (r: ClockRecord) => String(r.type_of_clock).toUpperCase()
+const nioIcon = (r: ClockRecord) =>
+  ({ CLOCK_IN: 'mdi-login', CLOCK_OUT: 'mdi-logout', GO_TO_LUNCH: 'mdi-food', BACK_FROM_LUNCH: 'mdi-food-off' })[nioKind(r)] ?? 'mdi-circle-small'
+const nioColor = (r: ClockRecord) =>
+  ({ CLOCK_IN: 'success', CLOCK_OUT: 'error', GO_TO_LUNCH: 'warning', BACK_FROM_LUNCH: 'success' })[nioKind(r)] ?? undefined
+const nioTitle = (r: ClockRecord) =>
+  ({ CLOCK_IN: 'Clock In', CLOCK_OUT: 'Clock Out', GO_TO_LUNCH: 'Go to lunch', BACK_FROM_LUNCH: 'Back to lunch' })[nioKind(r)] ?? nioKind(r)
 const isLunchOpen = (e: ActivityEvent) => e.type_of_activity === 'LUNCH' && e.end_time.startsWith('00:00:00')
 const short = (t: string) => t.slice(0, 8)
 
@@ -640,6 +730,17 @@ function friendly(e: RemoteClockError, action: 'CLOCK_IN' | 'CLOCK_OUT' = 'CLOCK
       return 'You have no open lunch.'
     case 'NO_ACTIVE_CLOCK_IN':
       return 'Clock in before registering lunch.'
+    case 'ON_LUNCH':
+      return 'You are on lunch: activity monitoring and screenshots are paused.'
+    case 'NOT_CLOCKED_IN':
+      return 'Your NIO app has no open shift. Clock in first.'
+    case 'NOT_LINKED':
+      return 'Lunch through the NIO app is only available in NIO + AR mode.'
+    case 'LUNCH_FROM_APP_ONLY':
+    case 'LUNCH_PROOF_INVALID':
+      return 'NIO + AR: lunch is registered through your NIO app. Open it on this computer and try again.'
+    case 'LUNCH_FAILED':
+      return e.message || 'Your NIO app could not register the lunch. Try again.'
     case 'NO_INTERNET':
       return 'Your desktop app has no internet connection.'
     case 'DEVICE_UNAVAILABLE':
@@ -783,10 +884,34 @@ async function doLunch(action: LunchAction) {
   if (!canLunch.value) return
   busy.value = action === 'IN' ? 'LUNCH_IN' : 'LUNCH_OUT'
   try {
-    await remoteClockService.lunch(external.value.trim(), action)
+    if (linked.value) {
+      // Modo NIO + AR: la app NIO ejecuta el lunch (screenshot + pausa del timer) y lo registra en el Activity.
+      await loadStatus()
+      if (!appConnected.value) {
+        notify(friendly({ code: 'DESKTOP_APP_REQUIRED', message: '' }), 'warning')
+        return
+      }
+      let nonce: string
+      try {
+        nonce = await localAppService.prepareClockNonce()
+      } catch (e) {
+        notify(friendly(e as RemoteClockError), 'warning')
+        void runLocalCheck()
+        return
+      }
+      const res = await remoteClockService.request(
+        external.value.trim(),
+        action === 'IN' ? 'LUNCH_IN' : 'LUNCH_OUT',
+        nonce,
+      )
+      if (!res.alreadyInState) localCooldownEnd.value = Date.now() + COOLDOWN_SEC * 1000
+    } else {
+      // Modo independiente (NIO | AR): lunch propio del Activity; no toca la app NIO.
+      await remoteClockService.lunch(external.value.trim(), action)
+    }
     rememberExternal()
-    notify(action === 'IN' ? 'Lunch started.' : 'Lunch finished.')
-    await loadActivity()
+    notify(action === 'IN' ? 'Go to lunch registered.' : 'Back to lunch registered.')
+    await Promise.all([loadActivity(), loadRecords()])
   } catch (e) {
     const err = e as RemoteClockError
     notify(friendly(err), err.status === 403 ? 'error' : 'warning')
@@ -858,7 +983,7 @@ async function submitFallback() {
 const onFocus = () => { void refreshAll() }
 
 onMounted(() => {
-  void refreshAll()
+  void refreshAll().finally(() => { ready.value = true })
   live.connect()
   offLinked = live.on('profile:linked', () => { void loadActivity().then(runLocalCheck) })
   offPresence = live.on<{ connected: boolean; onShift: boolean }>('device:presence', (p) => {
@@ -913,6 +1038,9 @@ onBeforeUnmount(() => {
 .ar-mode { display: inline-flex; align-items: center; gap: 4px; font-size: var(--app-text-xs, 0.75rem); font-weight: 600; letter-spacing: 0.02em; padding: 1px 8px; border-radius: 4px; border: 1px dashed rgba(var(--v-theme-on-surface), 0.35); color: rgb(var(--v-theme-on-surface-variant)); cursor: default; }
 .ar-mode--linked { border-style: solid; border-color: rgb(var(--v-theme-primary)); color: rgb(var(--v-theme-primary)); }
 .ar-warn { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding: 8px 12px; border-radius: 6px; font-size: var(--app-text-sm, 0.8125rem); color: rgb(var(--v-theme-warning)); background: rgba(var(--v-theme-warning), 0.1); border-inline-start: 3px solid rgb(var(--v-theme-warning)); }
+.ar-skel-text { background: transparent; }
+.ar-skel-field { max-width: 100%; }
+.ar-skel-action { border-radius: 16px; overflow: hidden; }
 .ar-events { max-height: 420px; overflow-y: auto; }
 
 .ar-dot { width: 14px; height: 14px; border-radius: 50%; flex: none; }
@@ -947,11 +1075,21 @@ onBeforeUnmount(() => {
 .ar-action:hover:not(.ar-action--disabled) { filter: brightness(0.97); transform: translateY(-1px); }
 .ar-action:focus-visible { outline: 2px solid rgb(var(--v-theme-primary)); outline-offset: 2px; }
 .ar-action--disabled { opacity: 0.45; cursor: not-allowed; }
-.ar-action-label { font-weight: 700; letter-spacing: 0.06em; }
+.ar-action-stack { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.ar-action-stack .ar-action-timer { font-size: 1.5rem; }
+.ar-action--in .ar-action-center, .ar-action--out .ar-action-center { color: inherit; }
+.ar-action--in .ar-action-stack { color: rgb(var(--v-theme-success)); }
+.ar-action--out .ar-action-stack { color: rgb(var(--v-theme-error)); }
+.ar-action-label { display: inline-flex; align-items: center; gap: 6px; font-weight: 700; letter-spacing: 0.06em; }
+.ar-action--lunch { background: rgba(var(--v-theme-warning), 0.1); border: 2px solid rgb(var(--v-theme-warning)); }
+.ar-action--lunch .ar-action-label, .ar-action--lunch .ar-action-center { color: rgb(var(--v-theme-warning)); }
+.ar-action--back { background: rgba(var(--v-theme-success), 0.1); border: 2px solid rgb(var(--v-theme-success)); }
+.ar-action--back .ar-action-label, .ar-action--back .ar-action-center { color: rgb(var(--v-theme-success)); }
 .ar-action-center { display: flex; align-items: center; justify-content: center; height: 92px; min-width: 150px; }
 .ar-action-wait { font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; }
 .ar-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 .ar-action-timer { font-variant-numeric: tabular-nums; font-size: 1.9rem; font-weight: 700; }
 .ar-action--out .ar-action-timer { color: rgb(var(--v-theme-error)); }
+.ar-action--back .ar-action-stack, .ar-action--back .ar-action-timer { color: rgb(var(--v-theme-success)); }
 .ar-action--in .ar-action-timer { color: rgb(var(--v-theme-success)); }
 </style>

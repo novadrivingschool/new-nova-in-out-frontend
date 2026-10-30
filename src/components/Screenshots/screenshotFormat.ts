@@ -56,6 +56,10 @@ export function clockTypeColor(type: string | null | undefined): string {
       return 'success'
     case 'clock_out':
       return 'error'
+    case 'go_to_lunch':
+      return 'warning'
+    case 'back_from_lunch':
+      return 'success'
     default:
       return 'primary'
   }
@@ -134,7 +138,9 @@ export function shouldShowProgress(image: ScreenshotImage | null): boolean {
   const hasActiveTime = image.active_time !== null && image.active_time !== undefined
   const isClockEvent =
     image.type_of_clock?.toLowerCase() === 'clock_in' ||
-    image.type_of_clock?.toLowerCase() === 'clock_out'
+    image.type_of_clock?.toLowerCase() === 'clock_out' ||
+    // Back to lunch no mide tiempo; Go to lunch sí (último tramo antes del lunch).
+    image.type_of_clock?.toLowerCase() === 'back_from_lunch'
   return hasActiveTime && !isClockEvent
 }
 

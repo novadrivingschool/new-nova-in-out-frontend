@@ -551,3 +551,29 @@ textarea::placeholder {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
+
+/*
+  Tooltips de ApexCharts siguiendo el tema de Vuetify.
+  Apex fija la clase `apexcharts-theme-light|dark` al crear el tooltip y no la
+  actualiza al cambiar de tema, así que se pintan con las variables del tema
+  activo (cambian al instante, sin depender de JS). La especificidad (3 clases)
+  gana a las reglas `.apexcharts-tooltip.apexcharts-theme-*` de la librería.
+*/
+.v-application .apexcharts-canvas .apexcharts-tooltip {
+  background: rgb(var(--v-theme-surface));
+  color: rgb(var(--v-theme-on-surface));
+  border: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+}
+
+.v-application .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-title {
+  background: rgba(var(--v-theme-on-surface), 0.06);
+  color: rgb(var(--v-theme-on-surface));
+  border-bottom: 1px solid rgba(var(--v-border-color), var(--v-border-opacity));
+}
+
+.v-application .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-text,
+.v-application .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-text-y-label,
+.v-application .apexcharts-canvas .apexcharts-tooltip .apexcharts-tooltip-text-y-value {
+  color: rgb(var(--v-theme-on-surface));
+}

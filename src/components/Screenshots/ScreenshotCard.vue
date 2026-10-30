@@ -96,6 +96,13 @@
         Reason: {{ adminReason }}
       </div>
       <div
+        v-else-if="forcedBack"
+        class="shot__reason"
+        title="El admin hizo un force clock out con el empleado en lunch: el regreso se registró por eso"
+      >
+        Back to lunch by admin · force clock out
+      </div>
+      <div
         v-else-if="fromLogout"
         class="shot__reason"
         title="Automatic clock out made when the employee logged out of the NIO app"
@@ -167,6 +174,11 @@ const fromActivity = computed(() => props.image.source === 'ACTIVITY_REPORT')
 /** Clock out automático por cerrar sesión en la app NIO (source APP_LOGOUT). */
 const fromLogout = computed(() => props.image.source === 'APP_LOGOUT')
 
+/** BACK_FROM_LUNCH registrado por un force clock out de un admin. */
+const forcedBack = computed(
+  () => props.image.type_of_clock?.toUpperCase() === 'BACK_FROM_LUNCH' && props.image.source === 'ADMIN_FORCE',
+)
+
 /** CLOCK_OUT hecho por un admin (FORCE_CLOCK_OUT). */
 const isSelfClockOut = computed(() => props.image.adminClockOut?.kind === 'SELF')
 const isAdminClockOut = computed(
@@ -186,6 +198,10 @@ const adminTitle = computed(() => {
 const badge = computed(() => {
   if (isAdminClockOut.value) return { label: 'CLOCK OUT · ADMIN', color: 'warning' }
   const clockType = props.image.type_of_clock?.trim()
+  // Back to lunch forzado: el admin hizo force clock out con el empleado en lunch.
+  if (clockType?.toUpperCase() === 'BACK_FROM_LUNCH' && props.image.source === 'ADMIN_FORCE') {
+    return { label: 'BACK FROM LUNCH · ADMIN', color: 'warning' }
+  }
   if (clockType) {
     return {
       label: formatClockType(clockType),

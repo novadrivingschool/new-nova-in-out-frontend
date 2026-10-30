@@ -118,7 +118,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
-import apexchart from 'vue3-apexcharts'
+import apexchart from '@/components/common/ApexChart.vue'
 import { useAttendanceChart } from '@/composables/useAttendanceChart'
 import { useResponsive } from '@/composables/useResponsive'
 import ActivityLoader from '@/components/common/ActivityLoader.vue'

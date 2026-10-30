@@ -27,7 +27,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import apexchart from 'vue3-apexcharts'
+import apexchart from '@/components/common/ApexChart.vue'
 import ChartCard from './ChartCard.vue'
 import { chartHelp } from '../dashboardHelp'
 import { useResponsive } from '@/composables/useResponsive'

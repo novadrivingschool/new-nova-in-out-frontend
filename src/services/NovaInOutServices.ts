@@ -436,12 +436,16 @@ const NovaInOutServices = {
   },
 
   /** Admin: employee_numbers con el Activity (AR) abierto hoy. Panel en vivo. */
-  async getActivityOpenNow(date: string): Promise<string[]> {
-    const response = await http.get<{ employee_numbers: string[] }>(
+  async getActivityOpenNow(date: string): Promise<{ open: string[]; lunch: string[] }> {
+    const response = await http.get<{ employee_numbers: string[]; lunch_employee_numbers?: string[] }>(
       `${API_NOVA_IN_OUT_URL}/nova-in-out/activity/open-now`,
       { params: { date } },
     );
-    return response.data?.employee_numbers ?? [];
+    return {
+      open: response.data?.employee_numbers ?? [],
+      // Subconjunto de `open` con el lunch abierto (Go to lunch sin Back to lunch).
+      lunch: response.data?.lunch_employee_numbers ?? [],
+    };
   },
 };
 

@@ -14,7 +14,10 @@ export interface ClockSession {
   startTime: string
   endDate: string | null
   endTime: string | null
+  /** Tiempo trabajado de la sesión, ya sin el lunch. */
   durationSeconds: number
+  /** Lunch descontado dentro de la sesión (s). */
+  lunchSeconds?: number
   open: boolean
   /** El clock out lo hizo un admin. */
   closedByAdmin: boolean
@@ -22,10 +25,25 @@ export interface ClockSession {
   adminReason: string | null
 }
 
+/** Un lunch (Go to lunch → Back to lunch). No entra al cálculo del performance. */
+export interface LunchPeriod {
+  /** YYYY-MM-DD del inicio. */
+  date: string
+  /** HH:MM */
+  start: string
+  /** HH:MM; null si sigue en curso. */
+  end: string | null
+  seconds: number
+  /** El regreso lo registró un admin por un force clock out. */
+  closedByAdmin: boolean
+}
+
 export interface DayStats {
   /** YYYY-MM-DD */
   date: string
   totalSeconds: number
+  /** Lunch del día (s); ya descontado de totalSeconds. */
+  lunchSeconds: number
   activeSeconds: number
   sessions: number
   /** 0–100, o `null` si ese día no hay capturas. */
@@ -91,6 +109,10 @@ export interface ScreenshotStats {
   /** Del día más reciente al más antiguo. */
   days: DayStats[]
   totalSeconds: number
+  /** Lunch total del rango (s). Ya descontado de totalSeconds y fuera del performance. */
+  lunchSeconds: number
+  /** Cada lunch del rango, en orden. */
+  lunches: LunchPeriod[]
   activeSeconds: number
   /** Tiempo activo sobre tiempo trabajado (0–100), o `null`. */
   activeShare: number | null

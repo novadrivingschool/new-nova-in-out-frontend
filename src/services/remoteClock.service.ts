@@ -37,11 +37,17 @@ export const remoteClockService = {
   },
 
   /** Pide a la app Electron del usuario un clock in / out (origen ACTIVITY_REPORT). */
-  async request(externalEmployeeNumber: string, action: RemoteClockAction): Promise<RemoteClockResult> {
+  async request(
+    externalEmployeeNumber: string,
+    action: RemoteClockAction,
+    /** Obligatorio para LUNCH_IN / LUNCH_OUT (handshake con la app NIO de este equipo). */
+    nonce?: string,
+  ): Promise<RemoteClockResult> {
     try {
       const { data } = await http.post<RemoteClockResult>('/remote-clock', {
         external_employee_number: externalEmployeeNumber,
         action,
+        ...(nonce ? { nonce } : {}),
       })
       return data
     } catch (e) {

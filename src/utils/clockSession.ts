@@ -45,6 +45,17 @@ export function clockRowsOf(records: ClockRecord[]): ClockRecord[] {
     )
 }
 
+/** CLOCK + LUNCH del NIO (GO_TO_LUNCH / BACK_FROM_LUNCH), en orden cronológico (hora, luego id). */
+export function lifecycleRowsOf(records: ClockRecord[]): ClockRecord[] {
+  const types = ['CLOCK_IN', 'CLOCK_OUT', 'GO_TO_LUNCH', 'BACK_FROM_LUNCH']
+  return records
+    .filter((r) => types.includes(String(r.type_of_clock).toUpperCase()))
+    .sort(
+      (a, b) =>
+        hhmmssToSeconds(a.clock_time) - hhmmssToSeconds(b.clock_time) || a.id - b.id,
+    )
+}
+
 /** true si el último evento de clock del día es un CLOCK_IN. */
 export function isClockedIn(records: ClockRecord[]): boolean {
   const rows = clockRowsOf(records)

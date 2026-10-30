@@ -1,4 +1,5 @@
-export type RemoteClockAction = 'CLOCK_IN' | 'CLOCK_OUT'
+/** LUNCH_IN = Go to lunch · LUNCH_OUT = Back to lunch (solo modo NIO + AR; los ejecuta la app NIO). */
+export type RemoteClockAction = 'CLOCK_IN' | 'CLOCK_OUT' | 'LUNCH_IN' | 'LUNCH_OUT'
 
 export interface RemoteClockResult {
   ok: true

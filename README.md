@@ -93,7 +93,7 @@ Sustituir la línea `# contenido de nginx.host.conf...` por el contenido real de
 ```bash
 cd ~/NovaInOut
 DC="docker-compose --env-file front.env -f front.yml -p nio-front"
-sed -i 's/^FRONT_IMAGE_TAG=.*/FRONT_IMAGE_TAG=1.0.3/' front.env     # la versión nueva
+sed -i 's/^FRONT_IMAGE_TAG=.*/FRONT_IMAGE_TAG=1.0.4/' front.env     # la versión nueva
 $DC pull
 $DC stop; $DC rm -f          # obligatorio en docker-compose v1 (bug ContainerConfig)
 $DC up -d

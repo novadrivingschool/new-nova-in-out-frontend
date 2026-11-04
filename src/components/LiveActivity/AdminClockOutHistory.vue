@@ -4,13 +4,13 @@
 -->
 <template>
   <div class="ah">
-    <div v-if="loading" class="ah__state">
+    <div v-if="loading && !items.length" class="ah__state">
       <v-progress-circular indeterminate size="20" width="2" />
     </div>
 
-    <p v-else-if="error" class="ah__state text-error">{{ error }}</p>
+    <p v-else-if="error && !items.length" class="ah__state text-error">{{ error }}</p>
 
-    <p v-else-if="!items.length" class="ah__state text-medium-emphasis">No admin clock outs yet.</p>
+    <p v-else-if="!items.length && !loading" class="ah__state text-medium-emphasis">No admin clock outs yet.</p>
 
     <v-list v-else density="compact" class="ah__list" lines="two">
       <v-list-item v-for="h in items" :key="h.id" class="ah__item">
@@ -67,18 +67,25 @@ async function load(): Promise<void> {
     return
   }
   loading.value = true
-  error.value = ''
   try {
     items.value = await NovaInOutServices.getAdminClockOutHistory(props.employeeNumber)
+    error.value = ''
   } catch (e: any) {
     error.value = e?.response?.data?.message ?? 'Could not load the history.'
-    items.value = []
   } finally {
     loading.value = false
   }
 }
 
-watch(() => [props.employeeNumber, props.refreshKey], load, { immediate: true })
+watch(
+  () => props.employeeNumber,
+  () => {
+    items.value = []
+    void load()
+  },
+)
+watch(() => props.refreshKey, load)
+void load()
 </script>
 
 <style scoped>

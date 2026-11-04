@@ -5,7 +5,7 @@
   -->
   <PageContainer variant="wide">
     <PageHeader
-      title="Admin dashboard"
+      title="NIO Analytics"
       subtitle="Attendance, hours and activity for the selected day"
     />
 

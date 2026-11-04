@@ -24,7 +24,7 @@
       @click="toggleNav"
     />
 
-    <RouterLink to="/screenshots" class="shell-brand">
+    <RouterLink :to="HOME_ROUTE" class="shell-brand">
       <span class="shell-brand__mark">N<span class="shell-brand__accent">IO</span></span>
       <span class="shell-brand__divider" aria-hidden="true">/</span>
       <span class="shell-brand__page">{{ currentSection }}</span>
@@ -47,6 +47,7 @@
         </span>
       </template>
     </v-tooltip>
+
 
     <ThemeToggle density="comfortable" />
 
@@ -107,6 +108,7 @@
             :to="item.route"
             :title="item.title"
             :prepend-icon="item.icon"
+            :exact="item.exact"
             link
           />
         </template>
@@ -128,13 +130,22 @@ import { useAuth } from '@/stores/auth/useAuth'
 import { useResponsive } from '@/composables/useResponsive'
 import { useAdminSocket } from '@/composables/useAdminSocket'
 import ThemeToggle from '@/components/common/ThemeToggle.vue'
+import { HOME_ROUTE } from '@/router/home'
+import { PERMISSIONS_ROUTE, VIEW_CATALOG } from '@/config/views'
 
 interface MenuItem {
   title: string
   icon: string
   route: string
-  /** Si se define, solo los usuarios con alguno de estos roles ven la entrada. */
+  /** Vista que habilita la entrada; sin ella solo la ve super_admin. */
+  view?: string
+  superAdminOnly?: boolean
+  /** Visible a cualquier usuario autenticado, sin vista asignada (p. ej. Home). */
+  open?: boolean
+  /** Visible solo a usuarios con alguno de estos roles. */
   roles?: string[]
+  /** Activa el ítem solo con coincidencia exacta de ruta. */
+  exact?: boolean
 }
 
 const router = useRouter()
@@ -223,29 +234,34 @@ function toggleNav(): void {
   railOverride.value = !rail.value
 }
 
+// El menú sale del catálogo de vistas (`config/views.ts`): una sola fuente de verdad con el router.
 const menuItems: MenuItem[] = [
-  { title: 'Activity Report', icon: 'mdi-clock-check-outline', route: '/activity-report' },
-  { title: 'Screenshots', icon: 'mdi-image-outline', route: '/screenshots' },
-  { title: 'Live Activity', icon: 'mdi-pulse', route: '/live-staff-activity' },
-  { title: 'Dashboard', icon: 'mdi-chart-box-outline', route: '/admin-dashboard' },
-  { title: 'Users', icon: 'mdi-account-outline', route: '/users' },
+  { title: 'Home', icon: 'mdi-home-outline', route: HOME_ROUTE, open: true },
+  ...VIEW_CATALOG.map((v) => ({ title: v.title, icon: v.icon, route: v.route, view: v.key })),
   {
-    title: 'Settings',
-    icon: 'mdi-cog-outline',
-    route: '/settings',
-    roles: ['admin', 'super_admin'],
+    title: 'Permissions',
+    icon: 'mdi-shield-key-outline',
+    route: PERMISSIONS_ROUTE,
+    superAdminOnly: true,
   },
 ]
 
 const visibleMenuItems = computed(() =>
-  menuItems.filter(
-    (item) => !item.roles?.length || item.roles.some((r) => auth.user?.roles?.includes(r)),
-  ),
+  menuItems.filter((item) => {
+    if (item.open) return true
+    if (item.roles) return item.roles.some((role) => auth.user?.roles?.includes(role))
+    if (item.superAdminOnly) return auth.isSuperAdmin
+    if (!item.view) return false
+    return auth.canView(item.view as (typeof VIEW_CATALOG)[number]['key'])
+  }),
 )
 
 /** Sección actual, mostrada junto a la marca como migaja mínima. */
 const currentSection = computed(() => {
-  const match = menuItems.find((item) => route.path.startsWith(item.route))
+  // La ruta más específica gana.
+  const match = menuItems
+    .filter((item) => route.path.startsWith(item.route))
+    .sort((a, b) => b.route.length - a.route.length)[0]
   return match?.title ?? ''
 })
 

@@ -45,9 +45,21 @@ export function clockRowsOf(records: ClockRecord[]): ClockRecord[] {
     )
 }
 
-/** CLOCK + LUNCH del NIO (GO_TO_LUNCH / BACK_FROM_LUNCH), en orden cronológico (hora, luego id). */
+/**
+ * CLOCK + pausas del NIO (GO_TO_LUNCH / BACK_FROM_LUNCH / GO_BRB / BACK_FROM_BRB / GO_BIO / BACK_FROM_BIO), en orden
+ * cronológico (hora, luego id).
+ */
 export function lifecycleRowsOf(records: ClockRecord[]): ClockRecord[] {
-  const types = ['CLOCK_IN', 'CLOCK_OUT', 'GO_TO_LUNCH', 'BACK_FROM_LUNCH']
+  const types = [
+    'CLOCK_IN',
+    'CLOCK_OUT',
+    'GO_TO_LUNCH',
+    'BACK_FROM_LUNCH',
+    'GO_BRB',
+    'BACK_FROM_BRB',
+    'GO_BIO',
+    'BACK_FROM_BIO',
+  ]
   return records
     .filter((r) => types.includes(String(r.type_of_clock).toUpperCase()))
     .sort(

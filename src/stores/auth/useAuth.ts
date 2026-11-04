@@ -3,10 +3,18 @@ import { defineStore } from "pinia";
 import { http, ensureFreshAccessToken } from "@/lib/http";
 import type { AuthResponseDto, LoginWebRequest, UserDto } from "@/types/auth";
 import router from "@/router";
+import { formatDateString } from "@/utils/dateString";
+import type { ViewKey } from "@/config/views";
 
 const LS_ACCESS_KEY = "novaio_accessToken";
 const LS_REFRESH_KEY = "novaio_refreshToken";
 const LS_USER_KEY = "novaio_user";
+/** Día calendario local (YYYY-MM-DD) en que se introdujeron las credenciales. */
+const LS_LOGIN_DAY_KEY = "novaio_loginDay";
+/** Cada cuánto se revisa si cambió el día con la pestaña abierta. */
+const SESSION_CHECK_MS = 60_000;
+/** Cada cuánto se vuelve a leer roles y vistas permitidas desde la auth API. */
+const ME_TTL_MS = 60_000;
 const slog = (...a: any[]) => console.log("[AUTH]", ...a);
 
 export const useAuth = defineStore("auth", {
@@ -16,13 +24,19 @@ export const useAuth = defineStore("auth", {
     refreshToken: (localStorage.getItem(LS_REFRESH_KEY) || null) as
       | string
       | null,
+    loginDay: (localStorage.getItem(LS_LOGIN_DAY_KEY) || null) as string | null,
     loading: false,
     error: null as string | null,
+    /** Última lectura de /auth/me (ms). No se persiste. */
+    lastMeAt: 0,
   }),
 
   getters: {
     isLogged: (s) => !!s.accessToken && !!s.refreshToken,
     token: (s) => s.accessToken,
+    isSuperAdmin: (s) => !!s.user?.roles?.includes("super_admin"),
+    /** Solo las vistas otorgadas, también para super_admin (Permissions es la única que va por rol). */
+    canView: (s) => (view: ViewKey) => !!s.user?.viewPermissions?.includes(view),
   },
 
   actions: {
@@ -35,6 +49,7 @@ export const useAuth = defineStore("auth", {
       }
       this.accessToken = localStorage.getItem(LS_ACCESS_KEY);
       this.refreshToken = localStorage.getItem(LS_REFRESH_KEY);
+      this.loginDay = localStorage.getItem(LS_LOGIN_DAY_KEY);
 
       // tokens rotados desde http.ts
       window.addEventListener("auth:tokens-rotated", (ev: any) => {
@@ -58,6 +73,7 @@ export const useAuth = defineStore("auth", {
       window.addEventListener("storage", (e) => {
         if (e.key === LS_ACCESS_KEY) this.accessToken = e.newValue;
         if (e.key === LS_REFRESH_KEY) this.refreshToken = e.newValue;
+        if (e.key === LS_LOGIN_DAY_KEY) this.loginDay = e.newValue;
         if (e.key === LS_USER_KEY) {
           try {
             this.user = e.newValue ? JSON.parse(e.newValue) : null;
@@ -66,6 +82,14 @@ export const useAuth = defineStore("auth", {
           }
         }
       });
+
+      // Login diario con la pestaña abierta: los timers se frenan en pestañas
+      // ocultas, por eso también se revisa al volver a verla.
+      const check = () => void this.enforceDailyLogin();
+      document.addEventListener("visibilitychange", () => {
+        if (!document.hidden) check();
+      });
+      window.setInterval(check, SESSION_CHECK_MS);
     },
 
     async refreshNow() {
@@ -91,6 +115,76 @@ export const useAuth = defineStore("auth", {
       (http.defaults.headers as any).common =
         (http.defaults.headers as any).common || {};
       http.defaults.headers.common.Authorization = `Bearer ${access}`;
+    },
+
+    /**
+     * Re-lee roles y vistas permitidas. Los servidores validan en cada request; esto solo
+     * mantiene menú y rutas al día cuando un super_admin cambia permisos con la sesión abierta.
+     * Si falla, se conserva lo que ya había.
+     */
+    async refreshMe(force = false) {
+      if (!this.accessToken || !this.user) return;
+      if (!force && Date.now() - this.lastMeAt < ME_TTL_MS) return;
+      this.lastMeAt = Date.now();
+      try {
+        const { data } = await http.get<{
+          roles?: string[];
+          isActive?: boolean;
+          viewPermissions?: string[];
+        }>("/auth/me");
+        if (!this.user) return;
+        this.setUser({
+          ...this.user,
+          roles: data.roles ?? this.user.roles,
+          isActive: data.isActive ?? this.user.isActive,
+          viewPermissions: data.viewPermissions ?? [],
+        });
+      } catch (e) {
+        slog("refreshMe error (ignored)", e);
+      }
+    },
+
+    setLoginDay(day: string | null) {
+      this.loginDay = day;
+      try {
+        day
+          ? localStorage.setItem(LS_LOGIN_DAY_KEY, day)
+          : localStorage.removeItem(LS_LOGIN_DAY_KEY);
+      } catch {}
+    },
+
+    /**
+     * Hay credenciales guardadas pero el login no es de hoy (o no consta, p. ej.
+     * sesiones previas a esta regla): hay que volver a iniciar sesión aunque el
+     * token siga siendo válido.
+     */
+    isSessionStale(): boolean {
+      if (!this.accessToken && !this.refreshToken) return false;
+      return this.loginDay !== formatDateString(new Date());
+    },
+
+    /**
+     * Cierra la sesión por cambio de día. Solo limpia el cliente: NO llama a
+     * `/auth/logout`, porque el logout web borra el refresh token del USUARIO
+     * (hay un único hash por usuario) e invalidaría otras sesiones web suyas,
+     * incluida una recién iniciada. El siguiente login ya sobrescribe ese hash.
+     */
+    async expireSession(): Promise<void> {
+      slog("expireSession() → login diario requerido");
+      this._clearClientSide();
+    },
+
+    /** Para pestañas que llevan abiertas desde ayer: cierra y manda al login. */
+    async enforceDailyLogin() {
+      if (!this.isSessionStale()) return;
+      const current = router.currentRoute.value;
+      await this.expireSession();
+      if (!current.meta?.public) {
+        router.replace({
+          path: "/",
+          query: { redirect: current.fullPath, reason: "daily" },
+        });
+      }
     },
 
     setUser(user: UserDto | null) {
@@ -119,6 +213,8 @@ export const useAuth = defineStore("auth", {
           body,
         );
         this.setUser(data.user);
+        this.lastMeAt = Date.now();
+        this.setLoginDay(formatDateString(new Date()));
         this.setTokens(data.tokens.accessToken, data.tokens.refreshToken);
         slog("login END OK");
         return true;
@@ -148,6 +244,8 @@ export const useAuth = defineStore("auth", {
       this.user = null;
       this.accessToken = null;
       this.refreshToken = null;
+      this.loginDay = null;
+      this.lastMeAt = 0;
       try {
         localStorage.removeItem(LS_ACCESS_KEY);
       } catch {}
@@ -156,6 +254,9 @@ export const useAuth = defineStore("auth", {
       } catch {}
       try {
         localStorage.removeItem(LS_USER_KEY);
+      } catch {}
+      try {
+        localStorage.removeItem(LS_LOGIN_DAY_KEY);
       } catch {}
       try {
         delete (http.defaults.headers as any)?.common?.Authorization;

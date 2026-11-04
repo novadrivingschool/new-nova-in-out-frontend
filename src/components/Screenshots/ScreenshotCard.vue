@@ -103,6 +103,20 @@
         Back to lunch by admin · force clock out
       </div>
       <div
+        v-else-if="forcedBrbBack"
+        class="shot__reason"
+        title="El admin hizo un force clock out con el empleado en BRB: el regreso se registró por eso"
+      >
+        Back from BRB by admin · force clock out
+      </div>
+      <div
+        v-else-if="forcedBioBack"
+        class="shot__reason"
+        title="El admin hizo un force clock out con el empleado en bio break: el regreso se registró por eso"
+      >
+        Back from bio break by admin · force clock out
+      </div>
+      <div
         v-else-if="fromLogout"
         class="shot__reason"
         title="Automatic clock out made when the employee logged out of the NIO app"
@@ -179,6 +193,16 @@ const forcedBack = computed(
   () => props.image.type_of_clock?.toUpperCase() === 'BACK_FROM_LUNCH' && props.image.source === 'ADMIN_FORCE',
 )
 
+/** BACK_FROM_BRB registrado por un force clock out de un admin. */
+const forcedBrbBack = computed(
+  () => props.image.type_of_clock?.toUpperCase() === 'BACK_FROM_BRB' && props.image.source === 'ADMIN_FORCE',
+)
+
+/** BACK_FROM_BIO registrado por un force clock out de un admin. */
+const forcedBioBack = computed(
+  () => props.image.type_of_clock?.toUpperCase() === 'BACK_FROM_BIO' && props.image.source === 'ADMIN_FORCE',
+)
+
 /** CLOCK_OUT hecho por un admin (FORCE_CLOCK_OUT). */
 const isSelfClockOut = computed(() => props.image.adminClockOut?.kind === 'SELF')
 const isAdminClockOut = computed(
@@ -201,6 +225,12 @@ const badge = computed(() => {
   // Back to lunch forzado: el admin hizo force clock out con el empleado en lunch.
   if (clockType?.toUpperCase() === 'BACK_FROM_LUNCH' && props.image.source === 'ADMIN_FORCE') {
     return { label: 'BACK FROM LUNCH · ADMIN', color: 'warning' }
+  }
+  if (clockType?.toUpperCase() === 'BACK_FROM_BRB' && props.image.source === 'ADMIN_FORCE') {
+    return { label: 'BACK FROM BRB · ADMIN', color: 'warning' }
+  }
+  if (clockType?.toUpperCase() === 'BACK_FROM_BIO' && props.image.source === 'ADMIN_FORCE') {
+    return { label: 'BACK FROM BIO BREAK · ADMIN', color: 'warning' }
   }
   if (clockType) {
     return {

@@ -189,26 +189,54 @@
       <!-- ═══ NIO + Activity Report ═══ -->
       <v-card class="mb-4">
         <div class="user-info__section-head">
-          <span class="app-eyebrow">NIO / Activity Report clock</span>
+          <span class="app-eyebrow">Clock mode</span>
         </div>
         <v-divider />
         <div class="user-info__section-body">
+          <!-- NIO + AR deshabilitado (04-nov-2026): el NIO ya no tiene Activity Report propio.
           <v-switch
             v-if="isEditing"
-            v-model="formData.profile.activity_linked"
-            label="Link NIO + Activity Report (AR): clock only from the AR, with the NIO app open"
+            :model-value="!!formData.profile.activity_linked && !formData.profile.use_external_ar"
+            label="NIO + AR: the user clocks only from the NIO Activity Report, with the NIO app open"
             color="primary"
             inset
             hide-details="auto"
+            @update:model-value="(on: boolean | null) => { formData.profile.activity_linked = !!on; formData.profile.use_external_ar = false }"
           />
           <p v-else class="user-info__value">
             <v-chip size="small" variant="tonal" :color="user.profile?.activity_linked ? 'primary' : undefined">
-              {{ user.profile?.activity_linked ? 'NIO + AR (linked)' : 'NIO | AR (independent)' }}
+              {{ arModeLabel(user.profile) }} · {{ user.profile?.activity_linked ? 'linked' : 'independent' }}
             </v-chip>
           </p>
           <p class="text-caption text-medium-emphasis mt-2 mb-0">
-            When linked, the clock button of the NIO desktop app is disabled, and the Activity Report (AR) can only
-            Clock In / Clock Out while the user's NIO app is active.
+            When on, the user is linked to the NIO app: the clock button of the NIO desktop app is disabled and the NIO
+            Activity Report (AR) can only Clock In / Clock Out while the user's NIO app is active. Mutually exclusive
+            with NIO + AR VOUT: turning one on turns the other off.
+          </p>
+
+          <v-divider class="my-4" />
+          -->
+
+          <v-switch
+            v-if="isEditing"
+            :model-value="!!formData.profile.use_external_ar"
+            :rules="[rules.useExternalAr]"
+            :disabled="!formData.profile.use_external_ar && !formData.profile.external_employee_number?.trim()"
+            label="NIO + AR VOUT: the user clocks only from the Vout Activity Report, with the NIO app open"
+            color="primary"
+            inset
+            hide-details="auto"
+            @update:model-value="(on: boolean | null) => { formData.profile.use_external_ar = !!on; formData.profile.activity_linked = !!on }"
+          />
+          <p v-else class="user-info__value">
+            <v-chip size="small" variant="tonal" :color="user.profile?.use_external_ar ? 'primary' : undefined">
+              {{ user.profile?.use_external_ar ? 'AR: external employee number (Vout)' : 'AR: NIO employee number' }}
+            </v-chip>
+          </p>
+          <p class="text-caption text-medium-emphasis mt-2 mb-0">
+            When on, the user is linked to the NIO app through the external (Vout) Activity Report: it uses the external
+            employee number and commands the NIO app (NIO clock button disabled; Clock, Lunch, BRB come from Vout).
+            It can only be turned on once the external employee number is saved.
           </p>
         </div>
       </v-card>
@@ -412,6 +440,7 @@ import {
   type UserResponse,
 } from '@/types/auth'
 import { usersService } from '@/services/users.service'
+import { arModeLabel } from '@/utils/arMode'
 import { useResponsive } from '@/composables/useResponsive'
 import { useAuth } from '@/stores/auth/useAuth'
 
@@ -482,6 +511,7 @@ function snapshot(user: UserResponse) {
       avatarUrl: user.profile?.avatarUrl ?? '',
       external_employee_number: user.profile?.external_employee_number ?? '',
       activity_linked: user.profile?.activity_linked ?? false,
+      use_external_ar: user.profile?.use_external_ar ?? false,
       // Sin default: si el valor no cambia, buildPayload() no lo envía (el backend solo lo acepta de super_admin).
       dev_activity_bot: user.profile?.dev_activity_bot,
       // Igual: sin default, solo se envía si el super_admin lo cambia.
@@ -542,6 +572,11 @@ const rules = {
   rolesRequired: (v: Role[]) => (!!v && v.length > 0) || 'Pick at least one role',
   externalEmployeeNumber: (v?: string | null) =>
     !v || v.trim().length <= 50 || 'Max 50 characters',
+  // No se puede activar "Use external AR" sin número externo (y no se puede borrar mientras esté activo).
+  useExternalAr: (v?: boolean) =>
+    !v ||
+    !!formData.profile.external_employee_number?.trim() ||
+    'Enter the external employee number first (required for NIO + AR VOUT)',
 }
 
 watch(newPassword, () => {

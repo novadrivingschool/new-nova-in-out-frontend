@@ -47,7 +47,7 @@
           label="Total worked"
           :value="formatDuration(stats.totalSeconds)"
           :hint="`${stats.sessions.length} ${stats.sessions.length === 1 ? 'sesión' : 'sesiones'}`"
-          info="Tiempo entre cada clock in y su clock out, ya sin el lunch. Una sesión sin clock out cuenta hasta el último registro del rango."
+          info="Tiempo entre cada clock in y su clock out, ya sin el lunch, el BRB ni el bio break. Una sesión sin clock out cuenta hasta el último registro del rango."
         />
         <StatCard
           label="Lunch"
@@ -58,6 +58,20 @@
               : 'Sin lunch en este rango'
           "
           info="Tiempo entre Go to lunch y Back to lunch. Se descuenta de las horas trabajadas y no entra al cálculo del performance."
+        />
+        <StatCard
+          label="BRB"
+          :value="formatDuration(stats.brbSeconds ?? 0)"
+          :tone="(stats.brbOverSeconds ?? 0) > 0 ? 'error' : undefined"
+          :hint="brbHint"
+          info="Tiempo entre Be right back e I'm back. Se descuenta de las horas trabajadas. Cada BRB tiene una tolerancia (por evento, no acumulada): hasta ahí no impacta el performance; lo que la excede cuenta como tiempo inactivo."
+        />
+        <StatCard
+          label="Bio break"
+          :value="formatDuration(stats.bioSeconds ?? 0)"
+          :tone="(stats.bioOverSeconds ?? 0) > 0 ? 'error' : undefined"
+          :hint="bioHint"
+          info="Tiempo entre Bio break e I'm back. Se descuenta de las horas trabajadas. Cada bio break tiene su propia tolerancia (por evento, no acumulada): hasta ahí no impacta el performance; lo que la excede cuenta como tiempo inactivo."
         />
         <StatCard
           label="Active time"
@@ -74,7 +88,7 @@
           :tone="rating?.color"
           :badge="rating?.label"
           :hint="performanceHint"
-          info="Tiempo activo entre el tiempo capturable (la suma del intervalo de cada captura). Es el mismo cálculo de la barra de cada captura, sumado. El lunch no entra al cálculo."
+          info="Tiempo activo entre el tiempo capturable (la suma del intervalo de cada captura). Es el mismo cálculo de la barra de cada captura, sumado. El lunch no entra al cálculo. Del BRB y del bio break solo cuenta (como inactivo) lo que excede la tolerancia de cada evento."
         />
         <StatCard
           label="Connection"
@@ -130,6 +144,8 @@
               <th>Date</th>
               <th class="text-right">Worked</th>
               <th class="text-right">Lunch</th>
+              <th class="text-right">BRB</th>
+              <th class="text-right">Bio break</th>
               <th class="text-right">Active</th>
               <th class="daily__perf-col">Performance</th>
             </tr>
@@ -142,6 +158,34 @@
               </td>
               <td class="tabular text-right">
                 {{ day.lunchSeconds ? formatDuration(day.lunchSeconds) : '—' }}
+              </td>
+              <td class="tabular text-right">
+                <span
+                  v-if="day.brbSeconds"
+                  :class="{ 'text-error font-weight-bold': (day.brbOverSeconds ?? 0) > 0 }"
+                  :title="
+                    (day.brbOverSeconds ?? 0) > 0
+                      ? `${formatDuration(day.brbOverSeconds ?? 0)} over the BRB tolerance (counts against performance)`
+                      : undefined
+                  "
+                >
+                  {{ formatDuration(day.brbSeconds) }}
+                </span>
+                <template v-else>—</template>
+              </td>
+              <td class="tabular text-right">
+                <span
+                  v-if="day.bioSeconds"
+                  :class="{ 'text-error font-weight-bold': (day.bioOverSeconds ?? 0) > 0 }"
+                  :title="
+                    (day.bioOverSeconds ?? 0) > 0
+                      ? `${formatDuration(day.bioOverSeconds ?? 0)} over the bio break tolerance (counts against performance)`
+                      : undefined
+                  "
+                >
+                  {{ formatDuration(day.bioSeconds) }}
+                </span>
+                <template v-else>—</template>
               </td>
               <td class="tabular text-right">
                 {{ formatDuration(day.activeSeconds) }}
@@ -183,6 +227,8 @@
               <th>Clock in</th>
               <th>Clock out</th>
               <th class="text-right">Lunch</th>
+              <th class="text-right">BRB</th>
+              <th class="text-right">Bio break</th>
               <th class="text-right">Duration</th>
             </tr>
           </thead>
@@ -215,6 +261,12 @@
               </td>
               <td class="tabular text-right">
                 {{ session.lunchSeconds ? formatDuration(session.lunchSeconds) : '—' }}
+              </td>
+              <td class="tabular text-right">
+                {{ session.brbSeconds ? formatDuration(session.brbSeconds) : '—' }}
+              </td>
+              <td class="tabular text-right">
+                {{ session.bioSeconds ? formatDuration(session.bioSeconds) : '—' }}
               </td>
               <td class="tabular text-right history__duration">
                 {{ formatDuration(session.durationSeconds) }}
@@ -317,6 +369,30 @@ const sessionsDesc = computed(() => [...(props.stats?.sessions ?? [])].reverse()
 const sessionsHeight = computed(() => Math.min(360, 56 + (props.stats?.sessions.length ?? 0) * 49))
 const daysHeight = computed(() => Math.min(360, 56 + (props.stats?.days.length ?? 0) * 49))
 const anomalyHeight = computed(() => Math.min(360, 56 + (props.stats?.anomalies.length ?? 0) * 49))
+
+const brbHint = computed(() => {
+  const s = props.stats
+  if (!s) return undefined
+  const n = s.brbCount ?? s.brbs?.length ?? 0
+  if (!n) return 'Sin BRB en este rango'
+  const over = s.brbOverSeconds ?? 0
+  const base = `${n} ${n === 1 ? 'BRB' : 'BRBs'}`
+  return over > 0
+    ? `${base} · ${formatDuration(over)} sobre la tolerancia (cuenta como inactivo)`
+    : `${base} · dentro de la tolerancia`
+})
+
+const bioHint = computed(() => {
+  const s = props.stats
+  if (!s) return undefined
+  const n = s.bioCount ?? s.bios?.length ?? 0
+  if (!n) return 'Sin bio break en este rango'
+  const over = s.bioOverSeconds ?? 0
+  const base = `${n} ${n === 1 ? 'bio break' : 'bio breaks'}`
+  return over > 0
+    ? `${base} · ${formatDuration(over)} sobre la tolerancia (cuenta como inactivo)`
+    : `${base} · dentro de la tolerancia`
+})
 
 const performanceHint = computed(() => {
   const s = props.stats

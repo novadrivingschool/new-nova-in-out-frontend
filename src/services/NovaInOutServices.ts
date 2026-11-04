@@ -61,6 +61,11 @@ axios.interceptors.response.use(
       `❌ [Response] ${error.config?.method?.toUpperCase()} ${error.config?.url} → ${error.response?.status}`,
     );
 
+    // /auth/* (refresh, login, logout) lo gestiona lib/http.ts. Reintentar aquí
+    // un refresh que devolvió 401 provoca un bucle infinito de refreshes.
+    const url = String(error.config?.url ?? "");
+    if (url.includes("/auth/")) return Promise.reject(error);
+
     if (error.response?.status === 401 && !error.config.__isRetryRequest) {
       error.config.__isRetryRequest = true;
       const auth = useAuth(); // ← useAuth() aquí también
@@ -436,8 +441,32 @@ const NovaInOutServices = {
   },
 
   /** Admin: employee_numbers con el Activity (AR) abierto hoy. Panel en vivo. */
-  async getActivityOpenNow(date: string): Promise<{ open: string[]; lunch: string[] }> {
-    const response = await http.get<{ employee_numbers: string[]; lunch_employee_numbers?: string[] }>(
+  async getActivityOpenNow(
+    date: string,
+  ): Promise<{
+    open: string[]
+    lunch: string[]
+    brb: string[]
+    brbSince: Record<string, string>
+    brbToleranceSec: number | null
+    bio: string[]
+    bioSince: Record<string, string>
+    bioToleranceSec: number | null
+  }> {
+    const response = await http.get<{
+      employee_numbers: string[];
+      lunch_employee_numbers?: string[];
+      brb_employee_numbers?: string[];
+      /** Opcional: { employee_number: 'HH:mm:ss' (Chicago) } del inicio del BRB abierto. */
+      brb_since?: Record<string, string>;
+      /** Tolerancia (s) de cada BRB. */
+      brb_tolerance_sec?: number;
+      bio_employee_numbers?: string[];
+      /** { employee_number: 'HH:mm:ss' (Chicago) } del inicio del bio break abierto. */
+      bio_since?: Record<string, string>;
+      /** Tolerancia (s) de cada bio break. */
+      bio_tolerance_sec?: number;
+    }>(
       `${API_NOVA_IN_OUT_URL}/nova-in-out/activity/open-now`,
       { params: { date } },
     );
@@ -445,6 +474,14 @@ const NovaInOutServices = {
       open: response.data?.employee_numbers ?? [],
       // Subconjunto de `open` con el lunch abierto (Go to lunch sin Back to lunch).
       lunch: response.data?.lunch_employee_numbers ?? [],
+      // Subconjunto de `open` con el BRB abierto (Be right back sin I'm back).
+      brb: response.data?.brb_employee_numbers ?? [],
+      brbSince: response.data?.brb_since ?? {},
+      brbToleranceSec: response.data?.brb_tolerance_sec ?? null,
+      // Subconjunto de `open` con el bio break abierto (Bio break sin I'm back).
+      bio: response.data?.bio_employee_numbers ?? [],
+      bioSince: response.data?.bio_since ?? {},
+      bioToleranceSec: response.data?.bio_tolerance_sec ?? null,
     };
   },
 };

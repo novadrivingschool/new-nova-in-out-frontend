@@ -31,6 +31,8 @@ export interface UserDto {
   avatarUrl?: string;
   /** Identificador con el que el usuario inicia sesión en el front web. */
   employee_number?: string;
+  /** Vistas del front permitidas. super_admin las tiene todas aunque la lista venga vacía. */
+  viewPermissions?: string[];
 }
 
 export interface AuthResponseDto {
@@ -67,6 +69,8 @@ export interface CreateUserProfileDto {
   external_employee_number?: string;
   /** Modo vinculado NIO + Activity Report. */
   activity_linked?: boolean;
+  /** Usar el número externo en el Activity Report (requiere external_employee_number). */
+  use_external_ar?: boolean;
 }
 
 export interface CreateUserDto {
@@ -94,6 +98,8 @@ export interface UserProfile {
   external_employee_number?: string | null;
   /** Modo vinculado: NIO y Activity Report se usan en conjunto (ver ficha del usuario). */
   activity_linked?: boolean;
+  /** Usa el número externo (RR.HH.) en el Activity Report; si es false, el AR usa el employee_number del NIO. */
+  use_external_ar?: boolean;
   /** SOLO dev/pruebas: muestra el bot de actividad en la app NIO del usuario (switch solo para super_admin). */
   dev_activity_bot?: boolean;
   /** Abre la ventana de DevTools en la app NIO del usuario, en tiempo real (switch para super_admin y admin). */
@@ -109,6 +115,8 @@ export interface UserResponse {
   createdAt: string;
   updatedAt: string;
   profile: UserProfile;
+  /** Vistas del front permitidas (ver `config/views.ts`). */
+  viewPermissions?: string[];
 }
 
 /**

@@ -17,7 +17,7 @@
       key="activity-during-the-day"
       title="Activity during the day"
       subtitle="Rendimiento de cada captura"
-      info="Cada barra es una captura del día, coloreada según su rendimiento. Las barras moradas y negras son capturas sin conexión (sin internet / offline): la app sí mide la actividad aunque no haya red, y se envía al reconectar. Una línea punteada vertical marca una captura con 0% de actividad, del color de su estado (rojo si sí había conexión). La franja ámbar marca el lunch (de Go to lunch al siguiente registro): no entra al cálculo del performance."
+      info="Cada barra es una captura del día, coloreada según su rendimiento. Las barras moradas y negras son capturas sin conexión (sin internet / offline): la app sí mide la actividad aunque no haya red, y se envía al reconectar. Una línea punteada vertical marca una captura con 0% de actividad, del color de su estado (rojo si sí había conexión). La franja ámbar marca el lunch (de Go to lunch al siguiente registro): no entra al cálculo del performance. La franja azul marca un BRB (Be right back → I'm back) y la gris un bio break (Bio break → I'm back): lo que cada uno excede su tolerancia cuenta como inactivo, y por eso su franja se pinta en rojo."
       :empty="!stats.timeline.length"
       empty-title="No captures"
       empty-description="No hay capturas en este día."
@@ -35,6 +35,18 @@
         </li>
         <li v-if="stats.lunches.length">
           <span class="dot" :style="{ background: lunchColor }" /> Lunch · Go to lunch → Back to lunch (no cuenta en el performance)
+        </li>
+        <li v-if="stats.brbs?.length">
+          <span class="dot" :style="{ background: brbColor }" /> BRB · Be right back → I'm back (hasta la tolerancia no cuenta en el performance)
+        </li>
+        <li v-if="hasBrbOver">
+          <span class="dot" :style="{ background: brbOverColor }" /> BRB sobre la tolerancia (el exceso cuenta como inactivo)
+        </li>
+        <li v-if="stats.bios?.length">
+          <span class="dot" :style="{ background: bioColor }" /> Bio break · Bio break → I'm back (hasta la tolerancia no cuenta en el performance)
+        </li>
+        <li v-if="hasBioOver">
+          <span class="dot" :style="{ background: brbOverColor }" /> Bio break sobre la tolerancia (el exceso cuenta como inactivo)
         </li>
         <li v-for="item in connectionLegend" :key="item.label">
           <span class="dot" :style="{ background: item.color }" />
@@ -200,6 +212,9 @@ import { useResponsive } from '@/composables/useResponsive'
 import { mergeOptions, useChartTheme } from '@/composables/useChartTheme'
 import { formatHour, formatShortDate, roundTo } from '@/utils/chartFormat'
 import { statusLabel } from './screenshotFormat'
+import { bioClosedByAdmin, bioIsOpen, brbClosedByAdmin, brbIsOpen } from './screenshotStats'
+import { brbOverSeconds, brbToleranceOf } from '@/utils/brb'
+import { bioOverSeconds, bioToleranceOf } from '@/utils/bio'
 import { chicagoDate, chicagoTime } from '@/utils/clockSession'
 import type { ScreenshotStats } from './screenshotStats'
 
@@ -388,6 +403,64 @@ const tierLegend = computed(() => [
 ])
 
 const lunchColor = computed(() => token('warning'))
+const brbColor = computed(() => token('info'))
+/** BRB que pasó su tolerancia: crítico. */
+const brbOverColor = computed(() => token('error'))
+/** Bio break: color propio (secondary), distinto del lunch (ámbar) y del BRB (azul). */
+const bioColor = computed(() => token('secondary'))
+
+type PauseKind = 'lunch' | 'brb' | 'bio'
+/** Una pausa (lunch, BRB o bio break) del día, normalizada para dibujarla en la gráfica. */
+interface PausePeriod {
+  kind: PauseKind
+  start: string
+  end: string | null
+  seconds: number
+  closedByAdmin: boolean
+  /** Solo BRB / bio break: segundos que exceden su tolerancia. */
+  overSeconds: number
+}
+
+/** Lunches, BRB y bio breaks del rango en orden de inicio (la gráfica del día es de un solo día). */
+const pausePeriods = computed<PausePeriod[]>(() => {
+  const tolerance = brbToleranceOf(props.stats.brbToleranceSeconds)
+  const bioTolerance = bioToleranceOf(props.stats.bioToleranceSeconds)
+  const lunches: PausePeriod[] = props.stats.lunches.map((l) => ({
+    kind: 'lunch',
+    start: l.start,
+    end: l.end,
+    seconds: l.seconds,
+    closedByAdmin: l.closedByAdmin,
+    overSeconds: 0,
+  }))
+  const brbs: PausePeriod[] = (props.stats.brbs ?? []).map((b) => ({
+    kind: 'brb',
+    start: b.start,
+    end: brbIsOpen(b) ? null : b.end,
+    seconds: b.seconds,
+    closedByAdmin: brbClosedByAdmin(b),
+    overSeconds: b.overSeconds ?? brbOverSeconds(b.seconds, tolerance),
+  }))
+  const bios: PausePeriod[] = (props.stats.bios ?? []).map((b) => ({
+    kind: 'bio',
+    start: b.start,
+    end: bioIsOpen(b) ? null : b.end,
+    seconds: b.seconds,
+    closedByAdmin: bioClosedByAdmin(b),
+    overSeconds: b.overSeconds ?? bioOverSeconds(b.seconds, bioTolerance),
+  }))
+  return [...lunches, ...brbs, ...bios].sort((a, b) => a.start.localeCompare(b.start))
+})
+const hasBrbOver = computed(() => pausePeriods.value.some((p) => p.kind === 'brb' && p.overSeconds > 0))
+const hasBioOver = computed(() => pausePeriods.value.some((p) => p.kind === 'bio' && p.overSeconds > 0))
+
+/** Color de una pausa: ámbar el lunch, azul el BRB, gris el bio break y rojo el BRB / bio break que pasó su tolerancia. */
+function pauseColor(pause: PausePeriod | undefined): string {
+  if (!pause) return token('warning')
+  if (pause.kind === 'lunch') return lunchColor.value
+  if (pause.overSeconds > 0) return brbOverColor.value
+  return pause.kind === 'bio' ? bioColor.value : brbColor.value
+}
 
 /** Estados sin conexión que aparecen en el día; cada línea o barra respeta su tipo y color. */
 const connectionLegend = computed(() => {
@@ -401,11 +474,12 @@ type TimelineSlot =
   /** Tiempo transcurrido sin capturas todavía (turno abierto, hasta la hora actual). */
   | { kind: 'idle'; time: string }
   | {
-      kind: 'lunch'
+      kind: 'pause'
       /** Hora aproximada de esta posición (HH:MM). */
       time: string
-      /** Lunch al que pertenece (orden del día) y su rol en el rango. */
-      lunchIdx: number
+      /** Pausa (lunch, BRB o bio break) a la que pertenece (orden del día) y su rol en el rango. */
+      pauseIdx: number
+      pauseKind: PauseKind
       part: 'start' | 'middle' | 'end'
       text: string
     }
@@ -442,42 +516,54 @@ const captureStepMin = computed(() => {
 })
 
 /**
- * Posiciones de la gráfica: cada captura ocupa una y cada lunch ocupa tantas posiciones VACÍAS como
- * capturas habría cabido en su duración (mín. 1, máx. 40), justo después de su captura de Go to lunch.
- * El rango del lunch se ve así con su tamaño real y sin barras (no hay actividad); la barra de
- * Go to lunch queda fuera: es el último tramo medido antes de salir.
+ * Posiciones de la gráfica: cada captura ocupa una y cada pausa (lunch, BRB o bio break) ocupa tantas posiciones
+ * VACÍAS como capturas habría cabido en su duración (mín. 1, máx. 40), justo después de su captura de
+ * Go to lunch / Be right back. El rango de la pausa se ve así con su tamaño real y sin barras (no hay
+ * actividad); la barra de salida queda fuera: es el último tramo medido antes de irse.
  */
 const timelineSlots = computed<TimelineSlot[]>(() => {
   const points = props.stats.timeline
-  const lunchesAfter = new Map<number, TimelineSlot[]>()
-  props.stats.lunches.forEach((lunch, lunchIdx) => {
-    // Captura del Go to lunch = la ÚLTIMA captura a esa hora o antes (varias pueden compartir minuto).
+  const pausesAfter = new Map<number, TimelineSlot[]>()
+  const overDur = (sec: number) => {
+    const m = Math.round(sec / 60)
+    return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${Math.max(1, m)}m`
+  }
+  pausePeriods.value.forEach((pause, pauseIdx) => {
+    // Captura de la salida = la ÚLTIMA captura a esa hora o antes (varias pueden compartir minuto).
     let idx = -1
     points.forEach((p, i) => {
-      if (p.time <= lunch.start) idx = i
+      if (p.time <= pause.start) idx = i
     })
     const nowMin = isViewingToday.value ? toMin(chicagoTime().slice(0, 5)) : 0
-    // Un lunch en curso se mide hasta ahora (el registro solo llega hasta el Go to lunch).
-    const mins = Math.max(1, Math.round(lunch.seconds / 60), lunch.end === null ? nowMin - toMin(lunch.start) : 0)
+    // Una pausa en curso se mide hasta ahora (el registro solo llega hasta la salida).
+    const mins = Math.max(1, Math.round(pause.seconds / 60), pause.end === null ? nowMin - toMin(pause.start) : 0)
     const dur = mins >= 60 ? `${Math.floor(mins / 60)}h ${mins % 60}m` : `${mins}m`
-    const text = `Go to lunch ${lunch.start} → ${lunch.end ? `Back to lunch ${lunch.end}` : 'in progress'} · ${dur}${lunch.closedByAdmin ? ' · back by admin (force clock out)' : ''}`
+    const adminNote = pause.closedByAdmin ? ' · back by admin (force clock out)' : ''
+    const overNote = pause.overSeconds > 0 ? ` · ${overDur(pause.overSeconds)} over tolerance (counts as inactive)` : ''
+    const text =
+      pause.kind === 'lunch'
+        ? `Go to lunch ${pause.start} → ${pause.end ? `Back to lunch ${pause.end}` : 'in progress'} · ${dur}${adminNote}`
+        : pause.kind === 'brb'
+          ? `Be right back ${pause.start} → ${pause.end ? `I'm back ${pause.end}` : 'in progress'} · ${dur}${adminNote}${overNote}`
+          : `Bio break ${pause.start} → ${pause.end ? `I'm back ${pause.end}` : 'in progress'} · ${dur}${adminNote}${overNote}`
     const n = Math.min(40, Math.max(1, Math.round(mins / captureStepMin.value)))
-    const startMin = toMin(lunch.start)
+    const startMin = toMin(pause.start)
     const slots: TimelineSlot[] = []
     for (let k = 0; k < n; k++) {
       slots.push({
-        kind: 'lunch',
+        kind: 'pause',
         time: fromMin(startMin + (k * mins) / n),
-        lunchIdx,
+        pauseIdx,
+        pauseKind: pause.kind,
         part: k === 0 ? 'start' : k === n - 1 ? 'end' : 'middle',
         text,
       })
     }
-    lunchesAfter.set(idx, [...(lunchesAfter.get(idx) ?? []), ...slots])
+    pausesAfter.set(idx, [...(pausesAfter.get(idx) ?? []), ...slots])
   })
-  const slots: TimelineSlot[] = [...(lunchesAfter.get(-1) ?? [])]
+  const slots: TimelineSlot[] = [...(pausesAfter.get(-1) ?? [])]
   points.forEach((point, i) => {
-    slots.push({ kind: 'capture', point }, ...(lunchesAfter.get(i) ?? []))
+    slots.push({ kind: 'capture', point }, ...(pausesAfter.get(i) ?? []))
   })
   // Turno abierto hoy: la escala llega hasta la hora actual (posiciones vacías tras la última marca).
   if (isViewingToday.value && slots.length) {
@@ -486,8 +572,8 @@ const timelineSlots = computed<TimelineSlot[]>(() => {
       const t = toMin(slot.kind === 'capture' ? slot.point.time : slot.time)
       if (t > lastMin) lastMin = t
     }
-    for (const lunch of props.stats.lunches) {
-      if (lunch.end) lastMin = Math.max(lastMin, toMin(lunch.end))
+    for (const pause of pausePeriods.value) {
+      if (pause.end) lastMin = Math.max(lastMin, toMin(pause.end))
     }
     const nowMin = toMin(chicagoTime().slice(0, 5))
     const extra = Math.min(40, Math.floor((nowMin - lastMin) / captureStepMin.value))
@@ -496,33 +582,36 @@ const timelineSlots = computed<TimelineSlot[]>(() => {
   return slots
 })
 
-/** Posiciones (primera y última) de cada lunch en `timelineSlots`. */
-const lunchSpans = computed(() => {
+/** Posiciones (primera y última) de cada pausa en `timelineSlots`. */
+const pauseSpans = computed(() => {
   const spans = new Map<number, { first: number; last: number }>()
   timelineSlots.value.forEach((slot, i) => {
-    if (slot.kind !== 'lunch') return
-    const span = spans.get(slot.lunchIdx)
+    if (slot.kind !== 'pause') return
+    const span = spans.get(slot.pauseIdx)
     if (span) span.last = i
-    else spans.set(slot.lunchIdx, { first: i, last: i })
+    else spans.set(slot.pauseIdx, { first: i, last: i })
   })
-  return [...spans.values()]
+  return [...spans.entries()].map(([pauseIdx, span]) => ({ pauseIdx, ...span }))
 })
 
-/** Franja ámbar por lunch, de su Go to lunch a su Back to lunch. */
-const lunchBands = computed(() =>
-  lunchSpans.value.map((span, n) => ({
-    x: span.first - 0.5,
-    x2: span.last + 0.5,
-    fillColor: token('warning'),
-    // Alterna la opacidad: lunches seguidos se distinguen.
-    opacity: n % 2 === 0 ? 0.22 : 0.36,
-    borderColor: token('warning'),
-  })),
+/** Franja por pausa, de su salida a su regreso: ámbar (lunch), azul (BRB), gris (bio break) o roja (sobre la tolerancia). */
+const pauseBands = computed(() =>
+  pauseSpans.value.map((span, n) => {
+    const color = pauseColor(pausePeriods.value[span.pauseIdx])
+    return {
+      x: span.first - 0.5,
+      x2: span.last + 0.5,
+      fillColor: color,
+      // Alterna la opacidad: pausas seguidas se distinguen.
+      opacity: n % 2 === 0 ? 0.22 : 0.36,
+      borderColor: color,
+    }
+  }),
 )
 const timelineSeries = computed(() => [
   {
     name: 'Performance',
-    // Los lunches son posiciones sin barra (y: 0 no dibuja nada y mantiene el tooltip): ahí no hay actividad.
+    // Las pausas son posiciones sin barra (y: 0 no dibuja nada y mantiene el tooltip): ahí no hay actividad.
     data: timelineSlots.value.map((slot, i) => ({
       x: i,
       y: slot.kind === 'capture' ? slot.point.performance : 0,
@@ -546,11 +635,11 @@ const zeroLines = computed(() => {
   return lines
 })
 
-/** Color de la barra (y del punto del tooltip) de cada posición: su estado, su tramo o el del lunch. */
+/** Color de la barra (y del punto del tooltip) de cada posición: su estado, su tramo o el de su pausa. */
 function timelinePointColor(index: number): string {
   const slot = timelineSlots.value[index]
   if (!slot) return token('on-surface-variant')
-  if (slot.kind === 'lunch') return token('warning')
+  if (slot.kind === 'pause') return pauseColor(pausePeriods.value[slot.pauseIdx])
   if (slot.kind === 'idle') return token('on-surface-variant')
   if (slot.point.connected) return tierColor(slot.point.performance)
   return statusColorOf(slot.point.status)
@@ -560,6 +649,8 @@ const escapeHtml = (text: string): string =>
   text.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`)
 
 const lunchStarts = computed(() => new Set(props.stats.lunches.map((l) => l.start)))
+const brbStarts = computed(() => new Set((props.stats.brbs ?? []).map((b) => b.start)))
+const bioStarts = computed(() => new Set((props.stats.bios ?? []).map((b) => b.start)))
 
 /** Texto del tooltip de una captura: porcentaje y, si aplica, estado sin conexión y falta de actividad. */
 function timelineTooltipText(point: { time: string; performance: number; connected: boolean; status: string }): string {
@@ -567,6 +658,8 @@ function timelineTooltipText(point: { time: string; performance: number; connect
   if (!point.connected) notes.push(statusName(point.status))
   if (point.performance === 0) notes.push('sin actividad')
   if (lunchStarts.value.has(point.time)) notes.push('Go to lunch (último tramo antes de salir)')
+  if (brbStarts.value.has(point.time)) notes.push('Be right back (último tramo antes de salir)')
+  if (bioStarts.value.has(point.time)) notes.push('Bio break (último tramo antes de salir)')
   return notes.length ? `${point.performance}% · ${notes.join(' · ')}` : `${point.performance}%`
 }
 
@@ -583,7 +676,7 @@ function tooltipRow(color: string, label: string, value: string): string {
 
 const timelineOptions = computed(() =>
   mergeOptions(baseOptions.value, {
-    annotations: { xaxis: [...lunchBands.value, ...zeroLines.value] },
+    annotations: { xaxis: [...pauseBands.value, ...zeroLines.value] },
     colors: [
       ({ dataPointIndex }: { dataPointIndex: number }) => timelinePointColor(dataPointIndex),
     ],
@@ -635,15 +728,20 @@ const timelineOptions = computed(() =>
         if (slot.kind === 'idle') {
           return `<div class="apexcharts-tooltip-title">${escapeHtml(slot.time)}</div>` + tooltipRow(token('on-surface-variant'), 'Capture', 'pending (next capture not yet taken)')
         }
-        if (slot.kind === 'lunch') {
-          const lunch = props.stats.lunches[slot.lunchIdx]
+        if (slot.kind === 'pause') {
+          const pause = pausePeriods.value[slot.pauseIdx]
+          const names = {
+            lunch: { go: 'Go to lunch', back: 'Back to lunch', mid: 'Lunch' },
+            brb: { go: 'Be right back', back: "I'm back", mid: 'BRB' },
+            bio: { go: 'Bio break', back: "I'm back", mid: 'Bio break' },
+          }[slot.pauseKind]
           const [label, value] =
             slot.part === 'start'
-              ? ['Go to lunch', slot.text]
+              ? [names.go, slot.text]
               : slot.part === 'end'
-                ? [lunch?.end ? 'Back to lunch' : 'Lunch', slot.text]
-                : ['Lunch', slot.text]
-          return `<div class="apexcharts-tooltip-title">${escapeHtml(slot.time)}</div>` + tooltipRow(token('warning'), label, value)
+                ? [pause?.end ? names.back : names.mid, slot.text]
+                : [names.mid, slot.text]
+          return `<div class="apexcharts-tooltip-title">${escapeHtml(slot.time)}</div>` + tooltipRow(pauseColor(pause), label, value)
         }
         return (
           `<div class="apexcharts-tooltip-title">${escapeHtml(slot.point.time)}</div>` +

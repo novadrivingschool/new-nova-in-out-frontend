@@ -44,7 +44,6 @@ export function mondayOf(iso: string): string {
   return addDaysIso(iso, -((weekday + 6) % 7))
 }
 
-/** Hoy ('YYYY-MM-DD') en la zona de los horarios, igual que el backend. */
 /** Días calendario entre dos fechas, ambas inclusive (mismo día = 1). */
 export function daysBetweenIso(from: string, to: string): number {
   return Math.round((parseIso(to).getTime() - parseIso(from).getTime()) / 86_400_000) + 1
@@ -74,6 +73,7 @@ export function isoWeekdayOf(iso: string): number {
 
 export const MAX_VARIABLE_DAYS = 92
 
+/** Hoy ('YYYY-MM-DD') en la zona de los horarios, igual que el backend. */
 export function todayIso(now: Date = new Date()): string {
   return new Intl.DateTimeFormat('en-CA', {
     timeZone: SCHEDULE_TIME_ZONE,

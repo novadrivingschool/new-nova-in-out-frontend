@@ -129,12 +129,17 @@
                   mdi-information-outline
                 </v-icon>
               </template>
+              <!-- NIO + AR deshabilitado: el NIO ya no tiene Activity Report propio.
               <div class="mb-1">
-                <strong>NIO + AR</strong>: the employee clocks only from the Activity Report (AR) and the NIO desktop
+                <strong>NIO + AR</strong>: the employee clocks only from the NIO Activity Report (AR) and the NIO desktop
                 app must be open. The NIO app's clock button is disabled.
               </div>
+              -->
+              <div class="mb-1">
+                <strong>NIO + AR VOUT</strong>: same, but with the external Activity Report (Vout), which commands the NIO app.
+              </div>
               <div>
-                <strong>NIO | AR</strong>: the NIO app and the Activity Report (AR) clock independently.
+                <strong>NIO</strong>: not linked; the employee clocks from the NIO app.
               </div>
               <div class="mt-1">Changes apply immediately.</div>
             </v-tooltip>
@@ -143,33 +148,35 @@
 
         <template #item.profile.activity_linked="{ item }">
           <div class="d-flex justify-center" @click.stop>
-            <v-tooltip
-              :text="
-                item.profile?.activity_linked
-                  ? 'NIO + AR: NIO clock button disabled; the Activity Report clocks only while the NIO app is active. Click to make them independent'
-                  : 'NIO | AR: NIO and the Activity Report clock independently. Click to link them'
-              "
-              location="top"
-            >
-              <template #activator="{ props: tip }">
+            <v-menu location="bottom">
+              <template #activator="{ props: menuProps }">
                 <v-btn
-                  v-bind="tip"
-                  :color="item.profile?.activity_linked ? 'primary' : undefined"
-                  :variant="item.profile?.activity_linked ? 'flat' : 'outlined'"
-                  :prepend-icon="item.profile?.activity_linked ? 'mdi-link-variant' : 'mdi-link-variant-off'"
+                  v-bind="menuProps"
+                  :color="isLinkedMode(item) ? 'primary' : undefined"
+                  :variant="isLinkedMode(item) ? 'flat' : 'outlined'"
+                  :prepend-icon="isLinkedMode(item) ? 'mdi-link-variant' : 'mdi-link-variant-off'"
                   :loading="linkingId === item.id"
                   :disabled="linkingId !== null || !item.profile"
                   size="small"
                   rounded="pill"
                   class="users__link-btn text-capitalize"
-                  :aria-pressed="!!item.profile?.activity_linked"
-                  :aria-label="`Clock mode for ${item.profile?.employee_number ?? 'user'}: ${item.profile?.activity_linked ? 'NIO + AR (linked)' : 'NIO | AR (independent)'}. Click to change`"
-                  @click="setLinked(item, !item.profile?.activity_linked)"
+                  :aria-label="`Clock mode for ${item.profile?.employee_number ?? 'user'}: ${arModeLabel(item.profile)}. Click to change`"
                 >
-                  {{ item.profile?.activity_linked ? 'NIO + AR' : 'NIO | AR' }}
+                  {{ arModeLabel(item.profile) }}
                 </v-btn>
               </template>
-            </v-tooltip>
+              <v-list density="compact">
+                <v-list-item
+                  v-for="opt in AR_MODE_OPTIONS"
+                  :key="opt.mode"
+                  :active="arModeOf(item.profile) === opt.mode"
+                  :disabled="opt.mode === 'NIO_AR_VOUT' && !item.profile?.external_employee_number"
+                  :title="opt.title"
+                  :subtitle="opt.mode === 'NIO_AR_VOUT' && !item.profile?.external_employee_number ? 'Needs the external employee number' : opt.subtitle"
+                  @click="setArMode(item, opt.mode)"
+                />
+              </v-list>
+            </v-menu>
           </div>
         </template>
 
@@ -249,6 +256,7 @@
 </template>
 
 <script setup lang="ts">
+import { AR_MODE_LABEL, arFlagsOf, arModeLabel, arModeOf, type ArMode } from '@/utils/arMode'
 import { computed, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { usersService } from '@/services/users.service'
@@ -466,18 +474,33 @@ function confirmStatusChange(item: UserResponse): void {
 // ── Modo vinculado NIO + Activity ──────────────────────────────
 const linkingId = ref<string | null>(null)
 
-async function setLinked(item: UserResponse, linked: boolean): Promise<void> {
-  if (!item.profile || linkingId.value) return
-  const previous = !!item.profile.activity_linked
+const AR_MODE_OPTIONS: { mode: ArMode; title: string; subtitle: string }[] = [
+  { mode: 'NIO_INDEPENDENT', title: AR_MODE_LABEL.NIO_INDEPENDENT, subtitle: 'Not linked: clocks from the NIO app' },
+  // Deshabilitado (04-nov-2026): el NIO ya no tiene Activity Report propio.
+  // { mode: 'NIO_AR', title: AR_MODE_LABEL.NIO_AR, subtitle: 'Linked to the NIO Activity Report' },
+  { mode: 'NIO_AR_VOUT', title: AR_MODE_LABEL.NIO_AR_VOUT, subtitle: 'Linked to the Vout Activity Report' },
+]
+
+const isLinkedMode = (item: UserResponse): boolean =>
+  !!item.profile?.activity_linked || !!item.profile?.use_external_ar
+
+/** NIO + AR y NIO + AR VOUT son excluyentes y ambos vinculan al NIO; "NIO | AR" los apaga. */
+async function setArMode(item: UserResponse, mode: ArMode): Promise<void> {
+  if (!item.profile || linkingId.value || arModeOf(item.profile) === mode) return
+  const previous = {
+    activity_linked: !!item.profile.activity_linked,
+    use_external_ar: !!item.profile.use_external_ar,
+  }
+  const next = arFlagsOf(mode)
   linkingId.value = item.id
-  item.profile.activity_linked = linked // optimista; se revierte si falla
+  Object.assign(item.profile, next) // optimista; se revierte si falla
   try {
-    await usersService.updateUser(item.id, { profile: { activity_linked: linked } })
-    notify(linked ? 'Linked mode enabled' : 'Linked mode disabled')
+    await usersService.updateUser(item.id, { profile: next })
+    notify(`Mode set to ${AR_MODE_LABEL[mode]}`)
   } catch (error) {
     console.error(error)
-    item.profile.activity_linked = previous
-    notify('Could not update linked mode.', 'error')
+    Object.assign(item.profile, previous)
+    notify('Could not update the clock mode.', 'error')
   } finally {
     linkingId.value = null
   }

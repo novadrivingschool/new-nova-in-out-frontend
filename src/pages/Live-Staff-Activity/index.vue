@@ -25,7 +25,13 @@
           <span class="live__dot" :class="{ 'live__dot--idle': !activeCount }" />
           {{ activeCount }} active {{ activeCount === 1 ? 'session' : 'sessions' }}
           <span v-if="lunchCount" class="live__lunch">· {{ lunchCount }} on lunch</span>
-          <span v-if="noConnectionCount" class="live__warn">· {{ noConnectionCount }} without connection</span>
+          <span v-if="brbCount" class="live__brb" :class="{ 'live__brb--critical': brbCriticalCount }">
+            · {{ brbCount }} on BRB<template v-if="brbCriticalCount"> ({{ brbCriticalCount }} over tolerance)</template>
+          </span>
+          <span v-if="bioCount" class="live__bio" :class="{ 'live__bio--critical': bioCriticalCount }">
+            · {{ bioCount }} on bio break<template v-if="bioCriticalCount"> ({{ bioCriticalCount }} over tolerance)</template>
+          </span>
+          <span v-if="noConnectionCount" class="live__warn">· {{ noConnectionCount }} NIO offline</span>
           <span v-if="outOfSyncCount" class="live__warn">· {{ outOfSyncCount }} out of sync</span>
           <span v-if="offlineCount" class="live__muted">· {{ offlineCount }} offline</span>
         </span>
@@ -49,7 +55,7 @@
       <DataTableResponsive
         :headers="headers"
         :items="rows"
-        :loading="loading.devices"
+        :loading="loading.devices && !hasLoaded"
         item-value="rowKey"
         show-expand
         v-model:expanded="expanded"
@@ -71,12 +77,14 @@
             <div class="d-flex align-center ga-2">
               <span
                 class="live__badge"
-                :class="item.status === 'Active' ? 'live__badge--on' : item.status === 'Offline' ? 'live__badge--off' : item.status === 'Lunch' ? 'live__badge--lunch' : 'live__badge--warn'"
+                :class="item.status === 'Active' ? 'live__badge--on' : item.status === 'Offline' ? 'live__badge--off' : item.status === 'Lunch' ? 'live__badge--lunch' : item.status === 'BRB' ? (item.brbCritical ? 'live__badge--critical' : 'live__badge--brb') : item.status === 'Bio break' ? (item.bioCritical ? 'live__badge--critical' : 'live__badge--bio') : 'live__badge--warn'"
                 :title="item.statusDetail"
               >
                 <span class="live__badge-dot" />
                 <v-icon v-if="item.status === 'Lunch'" size="14" class="me-1">mdi-food</v-icon>
-                {{ item.status }}
+                <v-icon v-else-if="item.status === 'BRB'" size="14" class="me-1">mdi-timer-sand</v-icon>
+                <v-icon v-else-if="item.status === 'Bio break'" size="14" class="me-1">mdi-water</v-icon>
+                {{ item.status }}<template v-if="item.brbCritical || item.bioCritical"> · over tolerance</template>
               </span>
               <v-chip
                 size="x-small"
@@ -170,7 +178,7 @@
               />
             </template>
           </v-tooltip>
-          <v-tooltip :text="item.onLunch ? `${item.fullName} is on lunch` : `Test connection with ${item.fullName} (animation only, no screenshot)`" location="top">
+          <v-tooltip :text="item.onLunch ? `${item.fullName} is on lunch` : item.onBrb ? `${item.fullName} is on BRB` : item.onBio ? `${item.fullName} is on a bio break` : `Test connection with ${item.fullName} (animation only, no screenshot)`" location="top">
             <template #activator="{ props: tip }">
               <v-btn
                 v-bind="tip"
@@ -179,13 +187,13 @@
                 variant="text"
                 color="primary"
                 :aria-label="`Ping ${item.fullName}`"
-                :disabled="!item.online || !item.userId || item.onLunch"
+                :disabled="!item.online || !item.userId || item.onLunch || item.onBrb || item.onBio"
                 :loading="loading.pingId === item.rowKey"
                 @click="pingUser(item)"
               />
             </template>
           </v-tooltip>
-          <v-tooltip :text="item.onLunch ? `${item.fullName} is on lunch` : `Request screenshot + activity from ${item.fullName}`" location="top">
+          <v-tooltip :text="item.onLunch ? `${item.fullName} is on lunch` : item.onBrb ? `${item.fullName} is on BRB` : item.onBio ? `${item.fullName} is on a bio break` : `Request screenshot + activity from ${item.fullName}`" location="top">
             <template #activator="{ props: tip }">
               <v-btn
                 v-bind="tip"
@@ -194,7 +202,7 @@
                 variant="text"
                 color="primary"
                 :aria-label="`Handshake with ${item.fullName}`"
-                :disabled="!item.online || !item.userId || item.onLunch"
+                :disabled="!item.online || !item.userId || item.onLunch || item.onBrb || item.onBio"
                 :loading="loading.helloId === item.rowKey"
                 @click="startHandshake(item)"
               />
@@ -239,7 +247,12 @@ import {
 } from '@/types/adminClockOut'
 import { STATUS_LABEL } from '@/components/LiveActivity/handshakeFormat'
 import NovaInOutServices from '@/services/NovaInOutServices'
+import { externalActivityService } from '@/services/externalActivity.service'
+import { arModeLabel } from '@/utils/arMode'
 import { getTodayString } from '@/utils/getTodayString'
+import { chicagoTime, hhmmssToSeconds } from '@/utils/clockSession'
+import { brbToleranceOf, isBrbCritical } from '@/utils/brb'
+import { bioToleranceOf, isBioCritical } from '@/utils/bio'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import DataTableResponsive, {
@@ -254,6 +267,8 @@ interface DeviceUser {
     employee_number?: string
     /** true = modo NIO + AR (clock in/out siempre juntos); false = NIO independiente. */
     activity_linked?: boolean
+    /** true = el AR es el externo (Vout). Con activity_linked → modo NIO + AR VOUT. */
+    use_external_ar?: boolean
   } | null
 }
 
@@ -270,6 +285,10 @@ interface DeviceRecord {
   connected?: boolean
   /** La app NIO informa que el turno está en lunch (socket conectado, sin monitoreo). */
   onLunch?: boolean
+  /** La app NIO informa que el turno está en BRB (socket conectado, sin monitoreo). */
+  onBrb?: boolean
+  /** La app NIO informa que el turno está en bio break (socket conectado, sin monitoreo). */
+  onBio?: boolean
 }
 
 /** El listado es un monitor en vivo: se refresca solo. */
@@ -277,6 +296,8 @@ const REFRESH_MS = 20_000
 
 const { btnSize } = useResponsive()
 
+/** true tras la primera carga: los refrescos posteriores no deben desmontar la tabla (se perdería el scroll y las filas expandidas). */
+const hasLoaded = ref(false)
 const loading = reactive({ devices: false, helloId: null as string | null, pingId: null as string | null })
 const lastError = ref('')
 const snackbar = reactive({ show: false, text: '', color: 'success' })
@@ -298,6 +319,26 @@ const clockIns = ref<Record<string, string>>({})
 const arOpen = ref<Set<string> | null>(null)
 /** employee_numbers con lunch abierto en el Activity (respaldo si el socket no informó el lunch). */
 const lunchOpen = ref<Set<string>>(new Set())
+/** employee_numbers con BRB abierto en el Activity (respaldo si el socket no informó el BRB). */
+const brbOpen = ref<Set<string>>(new Set())
+/** Inicio ('HH:mm:ss', Chicago) del BRB abierto por employee_number, si el backend lo informa. */
+const brbSince = ref<Record<string, string>>({})
+/** Tolerancia (s) de cada BRB / bio break según el backend (null = respaldo del util). */
+const brbToleranceSec = ref<number | null>(null)
+const bioToleranceSec = ref<number | null>(null)
+/** employee_numbers con bio break abierto en el Activity (respaldo si el socket no informó el bio break). */
+const bioOpen = ref<Set<string>>(new Set())
+/** Inicio ('HH:mm:ss', Chicago) del bio break abierto por employee_number, si el backend lo informa. */
+const bioSince = ref<Record<string, string>>({})
+/** AR externo (Vout): abiertos hoy por employee_number del NIO. null = no se pudo consultar. */
+const voutOpen = ref<Set<string> | null>(null)
+const voutLunch = ref<Set<string>>(new Set())
+const voutBrb = ref<Set<string>>(new Set())
+const voutBio = ref<Set<string>>(new Set())
+const voutBrbSince = ref<Record<string, string>>({})
+/** Reloj de la vista: hace que el estado crítico del BRB / bio break se actualice sin esperar al refresco. */
+const nowTick = ref(Date.now())
+let nowTimer: ReturnType<typeof setInterval> | null = null
 /** Clock outs hechos por admin, por employee_number (historial independiente del handshake). */
 const adminCounts = ref<Record<string, number>>({})
 const adminHistoryRefresh = ref(0)
@@ -332,18 +373,27 @@ const allRows = computed(() =>
     const connected = device.connected === true
     const empNumber = owner?.profile?.employee_number ?? ''
     const linked = owner?.profile?.activity_linked === true
+    // AR externo (Vout): su estado abierto sale de Vout, no del AR del NIO.
+    const vout = owner?.profile?.use_external_ar === true
+    const modeLabel = arModeLabel(owner?.profile)
+    const arName = vout ? 'Vout AR' : 'Activity'
     const nioOpen = !!(empNumber && clockIns.value[empNumber])
     // Si AR no se pudo consultar no se puede afirmar desincronización.
-    const arKnown = arOpen.value !== null
-    const arIsOpen = !!(empNumber && arOpen.value?.has(empNumber))
+    const arSet = vout ? voutOpen.value : arOpen.value
+    const arKnown = arSet !== null
+    const arIsOpen = !!(empNumber && arSet?.has(empNumber))
+    const lunchSet = vout ? voutLunch.value : lunchOpen.value
+    const brbSet = vout ? voutBrb.value : brbOpen.value
+    const bioSet = vout ? voutBio.value : bioOpen.value
+    const brbSinceMap = vout ? voutBrbSince.value : brbSince.value
     // NIO + AR van de la mano: turno abierto en uno solo es un estado inválido.
     const outOfSync = linked && arKnown && nioOpen !== arIsOpen
     const hasOpenSession = nioOpen || (linked && arIsOpen)
     // Prioridad al que ya tiene el clock in: ese es el activo; el otro es el desincronizado.
     const syncNote = outOfSync
       ? nioOpen
-        ? 'NIO clocked in · Activity not synced'
-        : 'Activity clocked in · NIO not synced'
+        ? `NIO clocked in · ${arName} not synced`
+        : `${arName} clocked in · NIO not synced`
       : ''
     // Por lado: el que tiene el turno abierto está bien; el otro, si falta, es el desincronizado.
     const sideOf = (name: string, open: boolean, known = true) => {
@@ -352,23 +402,53 @@ const allRows = computed(() =>
       if (outOfSync) return { name, text: 'Not clocked in', color: 'warning', icon: 'mdi-alert-circle', title: `${name}: not clocked in — out of sync` }
       return { name, text: 'Clocked out', color: undefined, icon: 'mdi-circle-outline', title: `${name}: clocked out` }
     }
-    const sides = [sideOf('NIO', nioOpen), sideOf('Activity', arIsOpen, arKnown)]
+    const sides = [sideOf('NIO', nioOpen), sideOf(arName, arIsOpen, arKnown)]
     // Lunch solo existe en modo NIO + AR: el socket lo informa; el Activity lo confirma.
-    const onLunch = linked && hasOpenSession && (device.onLunch === true || !!(empNumber && lunchOpen.value.has(empNumber)))
-    const status: 'Active' | 'No connection' | 'Out of sync' | 'Offline' | 'Lunch' = outOfSync
+    const onLunch = linked && hasOpenSession && (device.onLunch === true || !!(empNumber && lunchSet.has(empNumber)))
+    // BRB (misma mecánica que el lunch, excluyente con él): estado propio, crítico al pasar la tolerancia.
+    const onBrb =
+      linked && hasOpenSession && !onLunch && (device.onBrb === true || !!(empNumber && brbSet.has(empNumber)))
+    const brbStart = onBrb && empNumber ? brbSinceMap[empNumber] : undefined
+    const brbCritical =
+      onBrb &&
+      !!brbStart &&
+      isBrbCritical(
+        Math.max(0, hhmmssToSeconds(chicagoTime(new Date(nowTick.value))) - hhmmssToSeconds(brbStart)),
+        brbToleranceOf(brbToleranceSec.value),
+      )
+    // Bio break (misma mecánica que el BRB, excluyente con el lunch y el BRB): estado propio, crítico al pasar su tolerancia.
+    const onBio =
+      linked &&
+      hasOpenSession &&
+      !onLunch &&
+      !onBrb &&
+      (device.onBio === true || !!(empNumber && bioSet.has(empNumber)))
+    const bioStart = onBio && empNumber ? bioSince.value[empNumber] : undefined
+    const bioCritical =
+      onBio &&
+      !!bioStart &&
+      isBioCritical(
+        Math.max(0, hhmmssToSeconds(chicagoTime(new Date(nowTick.value))) - hhmmssToSeconds(bioStart)),
+        bioToleranceOf(bioToleranceSec.value),
+      )
+    const status: 'Active' | 'NIO offline' | 'Out of sync' | 'Offline' | 'Lunch' | 'BRB' | 'Bio break' = outOfSync
       ? 'Out of sync'
       : onLunch
         ? 'Lunch'
-        : online
+        : onBrb
+          ? 'BRB'
+          : onBio
+            ? 'Bio break'
+            : online
         ? 'Active'
         : hasOpenSession
-          ? 'No connection'
+          ? 'NIO offline'
           : 'Offline'
     const statusDetail = [
-      `Mode: ${linked ? 'NIO + AR' : 'NIO only'}`,
+      `Mode: ${modeLabel}`,
       `Socket: ${connected ? 'connected' : 'disconnected'}${connected ? (online ? ' (on shift)' : ' (off shift)') : ''}`,
-      `NIO shift: ${nioOpen ? (onLunch ? 'open (lunch)' : 'open') : 'closed'}`,
-      ...(linked ? [`AR shift: ${arKnown ? (arIsOpen ? 'open' : 'closed') : 'unknown'}`] : []),
+      `NIO shift: ${nioOpen ? (onLunch ? 'open (lunch)' : onBrb ? 'open (BRB)' : onBio ? 'open (bio break)' : 'open') : 'closed'}`,
+      ...(linked ? [`${arName} shift: ${arKnown ? (arIsOpen ? 'open' : 'closed') : 'unknown'}`] : []),
     ].join(' · ')
 
     const initials =
@@ -396,9 +476,13 @@ const allRows = computed(() =>
       initials,
       online,
       onLunch,
+      onBrb,
+      brbCritical,
+      onBio,
+      bioCritical,
       connected,
       linked,
-      mode: linked ? 'NIO + AR' : 'NIO',
+      mode: modeLabel,
       status,
       statusDetail: syncNote ? `${syncNote} · ${statusDetail}` : statusDetail,
       syncNote,
@@ -415,10 +499,21 @@ const allRows = computed(() =>
 
 const activeCount = computed(() => allRows.value.filter((r) => r.status === 'Active').length)
 const lunchCount = computed(() => allRows.value.filter((r) => r.status === 'Lunch').length)
-const noConnectionCount = computed(() => allRows.value.filter((r) => r.status === 'No connection').length)
+const brbCount = computed(() => allRows.value.filter((r) => r.status === 'BRB').length)
+const brbCriticalCount = computed(() => allRows.value.filter((r) => r.status === 'BRB' && r.brbCritical).length)
+const bioCount = computed(() => allRows.value.filter((r) => r.status === 'Bio break').length)
+const bioCriticalCount = computed(() => allRows.value.filter((r) => r.status === 'Bio break' && r.bioCritical).length)
+const noConnectionCount = computed(() => allRows.value.filter((r) => r.status === 'NIO offline').length)
 const outOfSyncCount = computed(() => allRows.value.filter((r) => r.status === 'Out of sync').length)
 const offlineCount = computed(
-  () => allRows.value.length - activeCount.value - lunchCount.value - noConnectionCount.value - outOfSyncCount.value,
+  () =>
+    allRows.value.length -
+    activeCount.value -
+    lunchCount.value -
+    brbCount.value -
+    bioCount.value -
+    noConnectionCount.value -
+    outOfSyncCount.value,
 )
 /** Por defecto: activos + turnos abiertos sin conexión (para poder hacerles clock out). */
 const rows = computed(() =>
@@ -468,7 +563,6 @@ function notify(text: string, color: 'success' | 'error' | 'warning' = 'success'
 
 async function loadDevices(): Promise<void> {
   loading.devices = true
-  lastError.value = ''
   try {
     // Vista de monitoreo: siempre todos los usuarios (el backend exige rol admin).
     const url = '/devices/online?all=true'
@@ -489,9 +583,38 @@ async function loadDevices(): Promise<void> {
         return null
       }),
     ])
+    // AR externo (Vout) abierto hoy: solo se consulta si hay usuarios en modo NIO + AR VOUT en la lista
+    // (si no, no se llama a Vout). Si falla no se afirma desincronización.
+    const listed: DeviceRecord[] = Array.isArray(response.data?.devices) ? response.data.devices : []
+    const needsVout = listed.some((d) => {
+      const p = (d.user ?? response.data?.user ?? null)?.profile
+      return p?.use_external_ar === true && p?.activity_linked === true
+    })
+    const voutNow = needsVout
+      ? await externalActivityService.openNow(getTodayString()).catch((err: unknown) => {
+          console.warn('[live-staff] AR de Vout no disponible; NIO + AR VOUT sin validación del AR de Vout', (err as any)?.message ?? err)
+          return null
+        })
+      : null
+    // Vout: filas con usuario NIO vinculado; open = turno abierto, lunch/brb/bio = pausa abierta.
+    const vrows = voutNow ? voutNow.data.filter((r) => !!r.nio_employee_number) : null
+    voutOpen.value = vrows ? new Set(vrows.filter((r) => r.clockedIn).map((r) => r.nio_employee_number as string)) : null
+    voutLunch.value = new Set((vrows ?? []).filter((r) => r.lunchOpen).map((r) => r.nio_employee_number as string))
+    voutBrb.value = new Set((vrows ?? []).filter((r) => r.brbOpen).map((r) => r.nio_employee_number as string))
+    voutBio.value = new Set((vrows ?? []).filter((r) => r.bioOpen).map((r) => r.nio_employee_number as string))
+    voutBrbSince.value = Object.fromEntries(
+      (vrows ?? []).filter((r) => r.brbOpen && r.brb_since).map((r) => [r.nio_employee_number as string, r.brb_since as string]),
+    )
     arOpen.value = arOpenList ? new Set(arOpenList.open) : null
     lunchOpen.value = new Set(arOpenList?.lunch ?? [])
+    brbOpen.value = new Set(arOpenList?.brb ?? [])
+    brbSince.value = arOpenList?.brbSince ?? {}
+    brbToleranceSec.value = arOpenList?.brbToleranceSec ?? null
+    bioOpen.value = new Set(arOpenList?.bio ?? [])
+    bioSince.value = arOpenList?.bioSince ?? {}
+    bioToleranceSec.value = arOpenList?.bioToleranceSec ?? null
     adminCounts.value = counts ?? {}
+    lastError.value = ''
     user.value = response.data?.user ?? null
     devices.value = Array.isArray(response.data?.devices)
       ? response.data.devices
@@ -506,8 +629,10 @@ async function loadDevices(): Promise<void> {
   } catch (error) {
     console.error('[devices] load error:', error)
     lastError.value = messageForError(error)
-    devices.value = []
+    // En un refresco en segundo plano se conservan los datos anteriores: vaciar la tabla colapsaría la vista.
+    if (!hasLoaded.value) devices.value = []
   } finally {
+    hasLoaded.value = true
     loading.devices = false
   }
 }
@@ -625,10 +750,12 @@ onMounted(() => {
   offHandshake = adminSocket.on<HandshakeView>('handshake:update', applyUpdate)
   loadDevices()
   refreshTimer = setInterval(loadDevices, REFRESH_MS)
+  nowTimer = setInterval(() => { nowTick.value = Date.now() }, 10_000)
 })
 
 onUnmounted(() => {
   if (refreshTimer) clearInterval(refreshTimer)
+  if (nowTimer) clearInterval(nowTimer)
   offHandshake?.()
   stopPoll()
 })
@@ -715,6 +842,54 @@ onUnmounted(() => {
 
 .live__badge--lunch .live__badge-dot {
   background: rgb(var(--v-theme-warning));
+  opacity: 1;
+}
+
+.live__brb {
+  font-weight: 500;
+  color: rgb(var(--v-theme-info));
+}
+
+.live__brb--critical {
+  color: rgb(var(--v-theme-error));
+  font-weight: 600;
+}
+
+.live__badge--brb {
+  color: rgb(var(--v-theme-info));
+}
+
+.live__badge--brb .live__badge-dot {
+  background: rgb(var(--v-theme-info));
+  opacity: 1;
+}
+
+.live__bio {
+  font-weight: 500;
+  color: rgb(var(--v-theme-secondary));
+}
+
+.live__bio--critical {
+  color: rgb(var(--v-theme-error));
+  font-weight: 600;
+}
+
+.live__badge--bio {
+  color: rgb(var(--v-theme-secondary));
+}
+
+.live__badge--bio .live__badge-dot {
+  background: rgb(var(--v-theme-secondary));
+  opacity: 1;
+}
+
+.live__badge--critical {
+  color: rgb(var(--v-theme-error));
+  font-weight: 600;
+}
+
+.live__badge--critical .live__badge-dot {
+  background: rgb(var(--v-theme-error));
   opacity: 1;
 }
 

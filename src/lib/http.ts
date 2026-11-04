@@ -53,7 +53,22 @@ function explainRefreshFailure(status?: number, serverMessage?: any) {
  *  Refresh (POST /auth/refresh)
  *  — ENRIQUECE el error con code/status/serverMessage
  * ========================= */
-async function refreshTokens(): Promise<{ accessToken: string; refreshToken: string }> {
+type TokenPair = { accessToken: string; refreshToken: string }
+let refreshInFlight: Promise<TokenPair> | null = null
+
+/**
+ * Un solo refresh a la vez. El backend rota el refresh token en cada llamada:
+ * si dos peticiones refrescan en paralelo con el mismo token, la segunda llega
+ * con un token ya rotado y recibe 401.
+ */
+function refreshTokens(): Promise<TokenPair> {
+  if (!refreshInFlight) {
+    refreshInFlight = doRefreshTokens().finally(() => { refreshInFlight = null })
+  }
+  return refreshInFlight
+}
+
+async function doRefreshTokens(): Promise<TokenPair> {
   const rt = getRefreshToken()
   if (!rt) {
     const e: any = new Error("NO_REFRESH_TOKEN")

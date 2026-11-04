@@ -38,6 +38,14 @@
             <h1 class="login-card__title">Good to see you</h1>
 
             <p
+              v-if="notice && !auth.error"
+              class="login-card__notice mt-5"
+              role="status"
+            >
+              {{ notice }}
+            </p>
+
+            <p
               v-if="auth.error"
               class="login-card__error mt-5"
               role="alert"
@@ -107,6 +115,7 @@ import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuth } from '@/stores/auth/useAuth'
 import LoginBackdrop from '@/components/Login/LoginBackdrop.vue'
+import { HOME_ROUTE } from '@/router/home'
 
 const router = useRouter()
 const route = useRoute()
@@ -117,6 +126,20 @@ const password = ref('')
 const showPassword = ref(false)
 
 const hasError = computed(() => !!auth.error)
+
+/** Aviso informativo cuando se llega aquí por el cierre diario de sesión. */
+const notice = computed(() =>
+  route.query.reason === 'daily'
+    ? 'Sessions last one day. Please sign in again to continue.'
+    : '',
+)
+
+/** Solo rutas internas: evita redirecciones abiertas vía `?redirect=`. */
+function safeRedirect(value: unknown): string {
+  return typeof value === 'string' && value.startsWith('/') && !value.startsWith('//') && value !== '/'
+    ? value
+    : HOME_ROUTE
+}
 
 const canSubmit = computed(
   () => !!employeeNumber.value.trim() && !!password.value && !auth.loading,
@@ -134,8 +157,7 @@ async function handleLogin(): Promise<void> {
   const ok = await auth.login(employeeNumber.value, password.value)
   if (!ok) return
 
-  const redirect = (route.query.redirect as string) || '/screenshots'
-  await router.replace(redirect)
+  await router.replace(safeRedirect(route.query.redirect))
 }
 </script>
 
@@ -209,6 +231,15 @@ async function handleLogin(): Promise<void> {
   line-height: 1.2;
   margin: 0;
   color: rgb(var(--v-theme-on-surface));
+}
+
+.login-card__notice {
+  margin: 0;
+  padding-inline-start: var(--app-space-3);
+  border-inline-start: 2px solid rgb(var(--v-theme-on-surface-variant));
+  font-size: var(--app-text-sm);
+  color: rgb(var(--v-theme-on-surface-variant));
+  text-align: left;
 }
 
 .login-card__error {

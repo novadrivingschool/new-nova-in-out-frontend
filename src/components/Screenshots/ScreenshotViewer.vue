@@ -122,7 +122,9 @@
               <dt>Origin</dt>
               <dd>Activity Report (requested from the web)</dd>
             </template>
-            <template v-if="image.type_of_clock === 'BACK_FROM_LUNCH' && image.source === 'ADMIN_FORCE'">
+            <template
+              v-if="(image.type_of_clock === 'BACK_FROM_LUNCH' || image.type_of_clock === 'BACK_FROM_BRB' || image.type_of_clock === 'BACK_FROM_BIO') && image.source === 'ADMIN_FORCE'"
+            >
               <dt>Origin</dt>
               <dd>Registered by an administrator because of a force clock out</dd>
             </template>

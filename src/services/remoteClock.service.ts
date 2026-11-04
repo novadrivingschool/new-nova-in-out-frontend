@@ -2,6 +2,9 @@
 import { http } from '@/lib/http'
 import type {
   ActivityDay,
+  ActivityEvent,
+  BioAction,
+  BrbAction,
   LunchAction,
   RemoteClockAction,
   RemoteClockError,
@@ -40,7 +43,7 @@ export const remoteClockService = {
   async request(
     externalEmployeeNumber: string,
     action: RemoteClockAction,
-    /** Obligatorio para LUNCH_IN / LUNCH_OUT (handshake con la app NIO de este equipo). */
+    /** Obligatorio para LUNCH_IN / LUNCH_OUT / BRB_IN / BRB_OUT / BIO_IN / BIO_OUT (handshake con la app NIO de este equipo). */
     nonce?: string,
   ): Promise<RemoteClockResult> {
     try {
@@ -110,6 +113,84 @@ export const remoteClockService = {
         external_employee_number: externalEmployeeNumber,
         action,
       })
+    } catch (e) {
+      throw toRemoteClockError(e)
+    }
+  },
+
+  /** Be right back in / out del Activity (no pasa por la app de escritorio). */
+  async brb(externalEmployeeNumber: string, action: BrbAction): Promise<void> {
+    try {
+      await http.post(`${API_NOVA_IN_OUT_URL}/nova-in-out/activity/brb`, {
+        external_employee_number: externalEmployeeNumber,
+        action,
+      })
+    } catch (e) {
+      throw toRemoteClockError(e)
+    }
+  },
+
+  /** Bio break in / out del Activity (no pasa por la app de escritorio). */
+  async bio(externalEmployeeNumber: string, action: BioAction): Promise<void> {
+    try {
+      await http.post(`${API_NOVA_IN_OUT_URL}/nova-in-out/activity/bio`, {
+        external_employee_number: externalEmployeeNumber,
+        action,
+      })
+    } catch (e) {
+      throw toRemoteClockError(e)
+    }
+  },
+
+  // ── ACTIVITY (multitask): solo registro del AR; no pasa por la app de escritorio ni afecta horas ──
+
+  /** Activity In: abre una actividad con su título. */
+  async activityIn(externalEmployeeNumber: string, title: string): Promise<ActivityEvent> {
+    try {
+      const { data } = await http.post<ActivityEvent>(`${API_NOVA_IN_OUT_URL}/nova-in-out/activity/activities`, {
+        external_employee_number: externalEmployeeNumber,
+        title,
+      })
+      return data
+    } catch (e) {
+      throw toRemoteClockError(e)
+    }
+  },
+
+  /** Activity Out: cierra una actividad con sus notas. */
+  async activityOut(externalEmployeeNumber: string, id: number, notes: string): Promise<ActivityEvent> {
+    try {
+      const { data } = await http.patch<ActivityEvent>(
+        `${API_NOVA_IN_OUT_URL}/nova-in-out/activity/activities/${id}/close`,
+        { external_employee_number: externalEmployeeNumber, notes },
+      )
+      return data
+    } catch (e) {
+      throw toRemoteClockError(e)
+    }
+  },
+
+  /** Edita título y/o notas (las notas solo si la actividad está cerrada; solo el mismo día). */
+  async activityEdit(
+    externalEmployeeNumber: string,
+    id: number,
+    patch: { title?: string; notes?: string },
+  ): Promise<ActivityEvent> {
+    try {
+      const { data } = await http.patch<ActivityEvent>(
+        `${API_NOVA_IN_OUT_URL}/nova-in-out/activity/activities/${id}`,
+        { external_employee_number: externalEmployeeNumber, ...patch },
+      )
+      return data
+    } catch (e) {
+      throw toRemoteClockError(e)
+    }
+  },
+
+  /** Borra una actividad (solo el mismo día). */
+  async activityDelete(id: number): Promise<void> {
+    try {
+      await http.delete(`${API_NOVA_IN_OUT_URL}/nova-in-out/activity/activities/${id}`)
     } catch (e) {
       throw toRemoteClockError(e)
     }

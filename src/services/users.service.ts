@@ -27,7 +27,7 @@ export const usersService = {
         data: data.items,
         meta: data.meta,
       };
-    } catch (error) {
+    } catch (error: any) {
       console.error("[USERS] ✖ falló /users/filter", {
         status: error?.response?.status,
         data: error?.response?.data,
@@ -71,7 +71,7 @@ export const usersService = {
     try {
       const { data } = await http.get<UserResponse>(`/users/${id}`);
       return data;
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error fetching user:", error);
       throw error;
     }
@@ -80,6 +80,39 @@ export const usersService = {
   async updateUser(uuid: string, payload: UpdateUserDto): Promise<UserResponse> {
     try {
       const { data } = await http.patch<UserResponse>(`/users/${uuid}`, payload);
+      return data;
+    } catch (error: any) {
+      throw error.response?.data || error;
+    }
+  },
+
+  /** Valida la contraseña del módulo de permisos (la guarda el servidor en una variable de entorno). */
+  async unlockPermissions(
+    password: string,
+  ): Promise<{ token: string; expiresAt: string }> {
+    try {
+      const { data } = await http.post<{ token: string; expiresAt: string }>(
+        "/users/permissions/unlock",
+        { password },
+      );
+      return data;
+    } catch (error: any) {
+      throw error.response?.data || error;
+    }
+  },
+
+  /** Solo super_admin. Reemplaza la lista COMPLETA de vistas permitidas del usuario. */
+  async setViewPermissions(
+    uuid: string,
+    viewPermissions: string[],
+    unlockToken = "",
+  ): Promise<{ id: string; viewPermissions: string[] }> {
+    try {
+      const { data } = await http.put<{ id: string; viewPermissions: string[] }>(
+        `/users/${uuid}/view-permissions`,
+        { viewPermissions },
+        unlockToken ? { headers: { "x-permissions-unlock": unlockToken } } : undefined,
+      );
       return data;
     } catch (error: any) {
       throw error.response?.data || error;

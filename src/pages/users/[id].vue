@@ -14,7 +14,9 @@
         :auto-edit="autoEdit"
         @updated="handleUpdated"
       />
-      <UserSchedules :user-id="user.id" />
+      <!-- El horario y los eventos se administran en Master Schedule; aquí solo se consultan. -->
+      <UserSchedules :user-id="user.id" view-only />
+      <UserScheduleEvents :user-id="user.id" view-only />
     </template>
 
     <EmptyState
@@ -40,6 +42,7 @@ import { usersService } from '@/services/users.service'
 import type { UserResponse } from '@/types/auth'
 import UserInformation from '@/components/Users/UserInformation.vue'
 import UserSchedules from '@/components/Users/UserSchedules.vue'
+import UserScheduleEvents from '@/components/Users/UserScheduleEvents.vue'
 import PageContainer from '@/components/common/PageContainer.vue'
 import PageHeader from '@/components/common/PageHeader.vue'
 import ActivityLoader from '@/components/common/ActivityLoader.vue'

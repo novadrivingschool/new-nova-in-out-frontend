@@ -49,6 +49,13 @@ declare module 'vue' {
     TotalHoursDashboard: typeof import('./components/AdminDashboard/TotalHoursDashboard.vue')['default']
     TrendChart: typeof import('./components/AdminDashboard/charts/TrendChart.vue')['default']
     UserInformation: typeof import('./components/Users/UserInformation.vue')['default']
+    UserScheduleDeleteDialog: typeof import('./components/Users/UserScheduleDeleteDialog.vue')['default']
+    UserScheduleEventRow: typeof import('./components/Users/UserScheduleEventRow.vue')['default']
+    UserScheduleEvents: typeof import('./components/Users/UserScheduleEvents.vue')['default']
+    UserScheduleHistoryList: typeof import('./components/Users/UserScheduleHistoryList.vue')['default']
+    UserScheduleMenu: typeof import('./components/Users/UserScheduleMenu.vue')['default']
     UserSchedules: typeof import('./components/Users/UserSchedules.vue')['default']
+    UserScheduleSummary: typeof import('./components/Users/UserScheduleSummary.vue')['default']
+    UserScheduleWeekStrip: typeof import('./components/Users/UserScheduleWeekStrip.vue')['default']
   }
 }

@@ -5,12 +5,6 @@
   escritorio registra actividad y toma la captura de pantalla de TODOS los
   empleados.
 -->
-<route lang="json">{
-  "meta": {
-    "roles": ["admin", "super_admin"]
-  }
-}</route>
-
 <template>
   <PageContainer variant="narrow" align="start">
     <PageHeader title="Settings" subtitle="Global configuration for every employee" />

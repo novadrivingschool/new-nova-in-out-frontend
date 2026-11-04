@@ -4,13 +4,13 @@
 -->
 <template>
   <div class="hh">
-    <div v-if="loading" class="hh__state">
+    <div v-if="loading && !items.length" class="hh__state">
       <v-progress-circular indeterminate size="20" width="2" />
     </div>
 
-    <p v-else-if="error" class="hh__state text-error">{{ error }}</p>
+    <p v-else-if="error && !items.length" class="hh__state text-error">{{ error }}</p>
 
-    <p v-else-if="!items.length" class="hh__state text-medium-emphasis">No handshakes yet.</p>
+    <p v-else-if="!items.length && !loading" class="hh__state text-medium-emphasis">No handshakes yet.</p>
 
     <v-list v-else density="compact" class="hh__list" lines="one">
       <v-list-item
@@ -61,19 +61,26 @@ const error = ref('')
 
 async function load(): Promise<void> {
   loading.value = true
-  error.value = ''
   try {
     const res = await http.get<HandshakeView[]>('/handshakes', { params: { userId: props.userId } })
     items.value = Array.isArray(res.data) ? res.data : []
+    error.value = ''
   } catch (e: any) {
     error.value = e?.response?.data?.message ?? 'Could not load the history.'
-    items.value = []
   } finally {
     loading.value = false
   }
 }
 
-watch(() => [props.userId, props.refreshKey], load, { immediate: true })
+watch(
+  () => props.userId,
+  () => {
+    items.value = [] // otro usuario: no mostrar el historial anterior
+    void load()
+  },
+)
+watch(() => props.refreshKey, load)
+void load()
 </script>
 
 <style scoped>

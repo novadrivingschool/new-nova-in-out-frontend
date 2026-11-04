@@ -14,10 +14,14 @@ export interface ClockSession {
   startTime: string
   endDate: string | null
   endTime: string | null
-  /** Tiempo trabajado de la sesión, ya sin el lunch. */
+  /** Tiempo trabajado de la sesión, ya sin el lunch, el BRB ni el bio break. */
   durationSeconds: number
   /** Lunch descontado dentro de la sesión (s). */
   lunchSeconds?: number
+  /** BRB descontado dentro de la sesión (s). */
+  brbSeconds?: number
+  /** Bio break descontado dentro de la sesión (s). */
+  bioSeconds?: number
   open: boolean
   /** El clock out lo hizo un admin. */
   closedByAdmin: boolean
@@ -38,12 +42,54 @@ export interface LunchPeriod {
   closedByAdmin: boolean
 }
 
+/**
+ * Un BRB (Be right back → I'm back). Se descuenta de las horas trabajadas. Cada evento tiene una
+ * tolerancia (por evento): lo que la excede cuenta como tiempo inactivo en el performance.
+ */
+export interface BrbPeriod {
+  /** YYYY-MM-DD del inicio. */
+  date: string
+  /** HH:MM */
+  start: string
+  /** HH:MM; null si sigue en curso. */
+  end: string | null
+  seconds: number
+  /** Segundos que exceden la tolerancia (impactan el performance). */
+  overSeconds?: number
+  /** true si sigue en curso (si falta, se deduce de `end === null`). */
+  open?: boolean
+  /** El regreso lo registró un admin por un force clock out. */
+  byAdmin?: boolean
+  /** Mismo dato con el nombre que usa `LunchPeriod`. */
+  closedByAdmin?: boolean
+}
+
+export const brbIsOpen = (b: BrbPeriod): boolean => b.open ?? b.end === null
+export const brbClosedByAdmin = (b: BrbPeriod): boolean => b.byAdmin ?? b.closedByAdmin ?? false
+
+/**
+ * Un bio break (Bio break → I'm back). Misma mecánica que el BRB (se descuenta de las horas trabajadas y
+ * cada evento tiene su propia tolerancia por evento), pero se reporta APARTE: KPI, columna y franja propios.
+ */
+export type BioPeriod = BrbPeriod
+
+export const bioIsOpen = (b: BioPeriod): boolean => b.open ?? b.end === null
+export const bioClosedByAdmin = (b: BioPeriod): boolean => b.byAdmin ?? b.closedByAdmin ?? false
+
 export interface DayStats {
   /** YYYY-MM-DD */
   date: string
   totalSeconds: number
   /** Lunch del día (s); ya descontado de totalSeconds. */
   lunchSeconds: number
+  /** BRB del día (s); ya descontado de totalSeconds. */
+  brbSeconds?: number
+  /** Parte de los BRB del día que excede la tolerancia (s); cuenta como inactivo en el performance. */
+  brbOverSeconds?: number
+  /** Bio break del día (s); ya descontado de totalSeconds. */
+  bioSeconds?: number
+  /** Parte de los bio breaks del día que excede la tolerancia (s); cuenta como inactivo en el performance. */
+  bioOverSeconds?: number
   activeSeconds: number
   sessions: number
   /** 0–100, o `null` si ese día no hay capturas. */
@@ -113,6 +159,26 @@ export interface ScreenshotStats {
   lunchSeconds: number
   /** Cada lunch del rango, en orden. */
   lunches: LunchPeriod[]
+  /** BRB total del rango (s). Ya descontado de totalSeconds. */
+  brbSeconds?: number
+  /** Cantidad de BRB del rango. */
+  brbCount?: number
+  /** Suma de lo que cada BRB excede su tolerancia (s): cuenta como inactivo en el performance. */
+  brbOverSeconds?: number
+  /** Cada BRB del rango, en orden (para marcarlo en la gráfica del día). */
+  brbs?: BrbPeriod[]
+  /** Tolerancia por evento (s) con la que el backend calculó el exceso. */
+  brbToleranceSeconds?: number
+  /** Bio break total del rango (s). Ya descontado de totalSeconds. */
+  bioSeconds?: number
+  /** Cantidad de bio breaks del rango. */
+  bioCount?: number
+  /** Suma de lo que cada bio break excede su tolerancia (s): cuenta como inactivo en el performance. */
+  bioOverSeconds?: number
+  /** Cada bio break del rango, en orden (para marcarlo en la gráfica del día). */
+  bios?: BioPeriod[]
+  /** Tolerancia por evento (s) del bio break con la que el backend calculó el exceso. */
+  bioToleranceSeconds?: number
   activeSeconds: number
   /** Tiempo activo sobre tiempo trabajado (0–100), o `null`. */
   activeShare: number | null

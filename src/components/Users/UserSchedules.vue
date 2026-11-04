@@ -5,13 +5,18 @@
   - Fijo: se repite cada semana con fecha de inicio y de término opcional.
     Para cambiarlo hacia adelante se registra uno nuevo ("Replace from date…"),
     lo que deja el anterior cerrado y conserva el historial.
-  - Variable: una semana concreta; se registra una por semana.
+  - Variable: un periodo concreto con horario por fecha.
+  Se muestra el horario vigente (o el próximo) como tira semanal y el resto en
+  una lista plegable. El horario se edita en el diálogo de persona de Master
+  Schedule; con `viewOnly` (ficha del usuario) solo se muestra, con un enlace
+  para administrarlo allá. `embedded` quita la tarjeta y el título (el diálogo
+  ya los aporta).
 -->
 <template>
-  <v-card class="mb-4">
+  <v-card :variant="embedded ? 'flat' : 'elevated'" :class="embedded ? 'sched--embedded' : 'mb-4'">
     <div class="sched__head">
-      <div>
-        <span class="app-eyebrow">Work schedule</span>
+      <div class="sched__heading">
+        <h2 v-if="!embedded" class="sched__title">Work schedule</h2>
         <p class="sched__subtitle">All times are Chicago time (CT).</p>
       </div>
 
@@ -22,9 +27,10 @@
           prepend-icon="mdi-history"
           @click="historyOpen = true"
         >
-          History
+          Change log
         </v-btn>
         <v-btn
+          v-if="!viewOnly"
           color="primary"
           variant="flat"
           size="small"
@@ -32,11 +38,11 @@
           :disabled="forbidden"
           @click="openCreate()"
         >
-          Add schedule
+          New schedule
         </v-btn>
       </div>
     </div>
-    <v-divider />
+    <v-divider v-if="!embedded" />
 
     <ActivityLoader v-if="loading" label="Loading schedules…" />
 
@@ -54,83 +60,63 @@
     </v-alert>
 
     <EmptyState
-      v-else-if="!schedules.length"
+      v-else-if="!featured"
       title="No schedule registered"
-      description="Add a fixed schedule (repeats every week) or a variable one (one week at a time)."
-    />
+      :description="
+        viewOnly
+          ? 'Work schedules are managed in Master Schedule.'
+          : 'Create a fixed schedule (repeats every week) or a variable one (a specific period).'
+      "
+    >
+      <template v-if="!viewOnly" #actions>
+        <v-btn color="primary" variant="flat" prepend-icon="mdi-plus" @click="openCreate()">
+          New schedule
+        </v-btn>
+      </template>
+    </EmptyState>
 
-    <ul v-else class="sched__list">
-      <li
-        v-for="item in schedules"
-        :key="item.id"
-        class="sched__item"
-        :class="`sched__item--${statusOf(item)}`"
-      >
-        <div class="sched__item-main">
-          <div class="sched__item-top">
-            <v-chip size="x-small" variant="tonal" label>
-              {{ item.type === 'fixed' ? 'Fixed' : 'Variable' }}
-            </v-chip>
-            <v-chip
-              size="x-small"
-              label
-              :color="STATUS_META[statusOf(item)].color"
-              variant="tonal"
-            >
-              {{ STATUS_META[statusOf(item)].label }}
-            </v-chip>
-            <span class="sched__range">{{ describeRange(item) }}</span>
-          </div>
+    <div v-else class="sched__body">
+      <p v-if="featuredStatus !== 'current'" class="sched__note">
+        {{
+          featuredStatus === 'upcoming'
+            ? 'No schedule is in effect today. The next one is shown.'
+            : 'No schedule is in effect today. The latest one is shown.'
+        }}
+      </p>
 
-          <ul class="sched__days">
-            <li v-for="group in summarizeDays(item.days)" :key="group.days + group.hours">
-              <span class="sched__days-label">{{ group.days }}</span>
-              <span class="app-mono">{{ group.hours }}</span>
-              <span class="sched__lunch">
-                {{ group.lunch ? `lunch ${group.lunch}` : 'no lunch' }}
-              </span>
-            </li>
-          </ul>
+      <UserScheduleSummary :schedule="featured" :compact="viewOnly">
+        <template v-if="!viewOnly" #actions>
+          <v-btn
+            variant="tonal"
+            size="small"
+            prepend-icon="mdi-pencil-outline"
+            @click="openEdit(featured)"
+          >
+            Edit
+          </v-btn>
+          <UserScheduleMenu
+            :schedule="featured"
+            :status="featuredStatus"
+            @edit="openEdit(featured)"
+            @replace="openReplace(featured)"
+            @copy="openCopyPeriod(featured)"
+            @delete="openDelete(featured)"
+          />
+        </template>
+      </UserScheduleSummary>
 
-          <p v-if="item.notes" class="sched__notes">{{ item.notes }}</p>
-        </div>
-
-        <v-menu>
-          <template #activator="{ props: menuProps }">
-            <v-btn
-              v-bind="menuProps"
-              icon="mdi-dots-vertical"
-              variant="text"
-              size="small"
-              :aria-label="`Actions for schedule ${describeRange(item)}`"
-            />
-          </template>
-          <v-list density="compact">
-            <v-list-item prepend-icon="mdi-pencil-outline" title="Edit" @click="openEdit(item)" />
-            <v-list-item
-              v-if="item.type === 'fixed' && statusOf(item) !== 'past'"
-              prepend-icon="mdi-swap-horizontal"
-              title="Replace from date…"
-              @click="openReplace(item)"
-            />
-            <v-list-item
-              v-if="item.type === 'variable'"
-              prepend-icon="mdi-content-copy"
-              title="Copy to the next period…"
-              @click="openCopyPeriod(item)"
-            />
-            <v-list-item
-              prepend-icon="mdi-delete-outline"
-              title="Delete"
-              base-color="error"
-              @click="openDelete(item)"
-            />
-          </v-list>
-        </v-menu>
-      </li>
-    </ul>
+      <UserScheduleHistoryList
+        :schedules="others"
+        :view-only="viewOnly"
+        @edit="openEdit"
+        @replace="openReplace"
+        @copy="openCopyPeriod"
+        @delete="openDelete"
+      />
+    </div>
 
     <ScheduleFormDialog
+      v-if="!viewOnly"
       :show="formOpen"
       :user-id="userId"
       :schedule="editing"
@@ -146,72 +132,14 @@
       @close="historyOpen = false"
     />
 
-    <BaseDialog
-      :title="deleteStep === 1 ? 'Delete schedule' : 'Confirm deletion'"
-      :show="!!deleteTarget"
-      :width="480"
+    <UserScheduleDeleteDialog
+      v-if="!viewOnly"
+      :schedule="deleteTarget"
       :loading="deleting"
+      :error="deleteError"
       @close="closeDelete"
-    >
-      <template #dialog-body>
-        <template v-if="deleteStep === 1">
-          <p class="mb-2">
-            Delete the {{ deleteTarget?.type }} schedule
-            <strong>{{ deleteTarget ? describeRange(deleteTarget) : '' }}</strong>?
-          </p>
-          <v-alert
-            v-if="deleteTarget && statusOf(deleteTarget) !== 'upcoming'"
-            type="warning"
-            variant="tonal"
-            density="compact"
-            :text="
-              statusOf(deleteTarget) === 'current'
-                ? 'This schedule is in effect right now.'
-                : 'This schedule has already been worked.'
-            "
-          />
-        </template>
-        <template v-else>
-          <v-alert
-            type="error"
-            variant="tonal"
-            density="compact"
-            class="mb-2"
-            text="This cannot be undone."
-          />
-          <p class="mb-0">
-            <strong>{{ deleteTarget ? describeRange(deleteTarget) : '' }}</strong>
-            will be permanently removed from the schedule list. A record of the
-            deletion (with the full schedule) stays in the history.
-          </p>
-        </template>
-        <v-alert
-          v-if="deleteError"
-          type="error"
-          variant="tonal"
-          density="compact"
-          class="mt-3"
-          :text="deleteError"
-        />
-      </template>
-      <template #dialog-actions>
-        <v-btn variant="text" :disabled="deleting" @click="closeDelete">
-          Cancel
-        </v-btn>
-        <v-btn v-if="deleteStep === 1" color="error" variant="tonal" @click="deleteStep = 2">
-          Continue
-        </v-btn>
-        <v-btn
-          v-else
-          color="error"
-          variant="flat"
-          :loading="deleting"
-          @click="confirmDelete"
-        >
-          Yes, delete permanently
-        </v-btn>
-      </template>
-    </BaseDialog>
+      @confirm="confirmDelete"
+    />
 
     <v-snackbar v-model="snackbar.show" :color="snackbar.color">
       {{ snackbar.text }}
@@ -223,35 +151,42 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, reactive, ref, watch } from 'vue'
-import BaseDialog from '@/components/common/BaseDialog.vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import ActivityLoader from '@/components/common/ActivityLoader.vue'
 import EmptyState from '@/components/common/EmptyState.vue'
 import ScheduleFormDialog, {
   type ScheduleTemplate,
 } from '@/components/Users/ScheduleFormDialog.vue'
 import ScheduleHistoryDialog from '@/components/Users/ScheduleHistoryDialog.vue'
+import UserScheduleDeleteDialog from '@/components/Users/UserScheduleDeleteDialog.vue'
+import UserScheduleHistoryList from '@/components/Users/UserScheduleHistoryList.vue'
+import UserScheduleMenu from '@/components/Users/UserScheduleMenu.vue'
+import UserScheduleSummary from '@/components/Users/UserScheduleSummary.vue'
 import { schedulesService } from '@/services/schedules.service'
 import type { EmployeeSchedule } from '@/types/schedules'
 import {
   addDaysIso,
   daysBetweenIso,
-  describeRange,
   mondayOf,
   parseApiError,
   scheduleStatus,
-  summarizeDays,
   todayIso,
-  type ScheduleStatus,
 } from '@/utils/schedule'
+import { orderHistory, pickFeatured } from '@/utils/user-schedule-view'
 
-const props = defineProps<{ userId: string }>()
+const props = withDefaults(
+  defineProps<{ userId: string; viewOnly?: boolean; embedded?: boolean }>(),
+  { viewOnly: false, embedded: false },
+)
 
-const STATUS_META: Record<ScheduleStatus, { label: string; color: string }> = {
-  current: { label: 'Current', color: 'success' },
-  upcoming: { label: 'Upcoming', color: 'info' },
-  past: { label: 'Past', color: 'default' },
-}
+const emit = defineEmits<{
+  /** El horario base cambió (alta, edición o borrado). */
+  (e: 'changed'): void
+  /** Horarios cargados (primera carga y tras cada cambio). */
+  (e: 'loaded', schedules: EmployeeSchedule[]): void
+}>()
+
+// El enlace a Master Schedule solo lo ve quien tiene esa vista (si no, iría a /forbidden).
 
 const schedules = ref<EmployeeSchedule[]>([])
 const loading = ref(true)
@@ -264,13 +199,16 @@ const template = ref<ScheduleTemplate | null>(null)
 const historyOpen = ref(false)
 
 const deleteTarget = ref<EmployeeSchedule | null>(null)
-const deleteStep = ref<1 | 2>(1)
 const deleting = ref(false)
 const deleteError = ref('')
 
 const snackbar = reactive({ show: false, text: '', color: 'success' })
 
-const statusOf = (item: EmployeeSchedule) => scheduleStatus(item)
+const featured = computed(() => pickFeatured(schedules.value))
+const featuredStatus = computed(() =>
+  featured.value ? scheduleStatus(featured.value) : ('current' as const),
+)
+const others = computed(() => orderHistory([...schedules.value], featured.value?.id ?? null))
 
 function notify(text: string, color: 'success' | 'error' = 'success'): void {
   snackbar.text = text
@@ -284,6 +222,7 @@ async function load(): Promise<void> {
   forbidden.value = false
   try {
     schedules.value = await schedulesService.list(props.userId)
+    emit('loaded', schedules.value)
   } catch (error: any) {
     forbidden.value = error?.statusCode === 403
     errorMessage.value = parseApiError(error, 'Could not load the schedules.')
@@ -346,11 +285,11 @@ async function onSaved(): Promise<void> {
   const wasEdit = !!editing.value
   closeForm()
   await load()
+  emit('changed')
   notify(wasEdit ? 'Schedule updated.' : 'Schedule saved.')
 }
 
 function openDelete(item: EmployeeSchedule): void {
-  deleteStep.value = 1
   deleteError.value = ''
   deleteTarget.value = item
 }
@@ -358,18 +297,17 @@ function openDelete(item: EmployeeSchedule): void {
 function closeDelete(): void {
   if (deleting.value) return
   deleteTarget.value = null
-  deleteStep.value = 1
 }
 
 async function confirmDelete(): Promise<void> {
-  if (!deleteTarget.value || deleteStep.value !== 2) return
+  if (!deleteTarget.value) return
   deleting.value = true
   deleteError.value = ''
   try {
     await schedulesService.remove(props.userId, deleteTarget.value.id)
     deleteTarget.value = null
-    deleteStep.value = 1
     await load()
+    emit('changed')
     notify('Schedule deleted.')
   } catch (error) {
     deleteError.value = parseApiError(error)
@@ -380,6 +318,16 @@ async function confirmDelete(): Promise<void> {
 </script>
 
 <style scoped>
+.sched--embedded {
+  background: transparent;
+}
+
+.sched--embedded .sched__head,
+.sched--embedded .sched__body {
+  padding-left: 0;
+  padding-right: 0;
+}
+
 .sched__head {
   display: flex;
   align-items: flex-start;
@@ -387,6 +335,12 @@ async function confirmDelete(): Promise<void> {
   gap: var(--app-space-3);
   flex-wrap: wrap;
   padding: var(--app-space-3) var(--app-space-4);
+}
+
+.sched__title {
+  margin: 0;
+  font-size: var(--app-text-md);
+  font-weight: 600;
 }
 
 .sched__subtitle {
@@ -398,76 +352,20 @@ async function confirmDelete(): Promise<void> {
 .sched__head-actions {
   display: flex;
   align-items: center;
-  gap: var(--app-space-2);
-}
-
-.sched__list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.sched__item {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: var(--app-space-3);
-  padding: var(--app-space-3) var(--app-space-4);
-}
-
-.sched__item + .sched__item {
-  border-top: 1px solid rgba(var(--v-border-color), 1);
-}
-
-.sched__item--past {
-  opacity: 0.7;
-}
-
-.sched__item-main {
-  min-width: 0;
-}
-
-.sched__item-top {
-  display: flex;
   flex-wrap: wrap;
-  align-items: center;
   gap: var(--app-space-2);
 }
 
-.sched__range {
-  font-size: var(--app-text-md);
-  font-weight: 550;
-}
-
-.sched__days {
-  list-style: none;
-  margin: var(--app-space-2) 0 0;
-  padding: 0;
+.sched__body {
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: var(--app-text-sm);
+  gap: var(--app-space-3);
+  padding: var(--app-space-3) var(--app-space-4) var(--app-space-4);
 }
 
-.sched__days li {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--app-space-1) var(--app-space-3);
-}
-
-.sched__days-label {
-  min-width: 7.5rem;
-  font-weight: 500;
-}
-
-.sched__lunch {
-  color: rgb(var(--v-theme-on-surface-variant));
-}
-
-.sched__notes {
-  margin: var(--app-space-2) 0 0;
+.sched__note {
+  margin: 0;
   font-size: var(--app-text-sm);
   color: rgb(var(--v-theme-on-surface-variant));
-  overflow-wrap: anywhere;
 }
 </style>

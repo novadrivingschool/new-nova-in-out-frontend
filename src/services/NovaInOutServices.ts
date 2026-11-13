@@ -1,6 +1,7 @@
 // src/services/NovaInOutServices.ts
 
 import axios from "axios";
+import { runtimeEnv } from '@/lib/runtimeEnv'
 import { useAuth } from "@/stores/auth/useAuth";
 import { http } from "@/lib/http";
 import type {
@@ -13,12 +14,12 @@ import type {
   ForceClockOutReason,
 } from "@/types/adminClockOut";
 
-// ✅ Las constantes se leen aquí — Vite las inyecta en build time,
+// ✅ Las constantes se leen aquí — vienen de /config.js (runtime) o, en local, del .env,
 //    no dependen de Pinia ni del ciclo de vida de Vue.
 const API_AUTH_URL =
-  import.meta.env.VITE_API_AUTH_URL || "http://localhost:5013";
+  runtimeEnv('VITE_API_AUTH_URL') || "http://localhost:5013";
 const API_NOVA_IN_OUT_URL =
-  import.meta.env.VITE_API_NOVA_IN_OUT_URL || "http://localhost:5017";
+  runtimeEnv('VITE_API_NOVA_IN_OUT_URL') || "http://localhost:5017";
 
 console.log("🚀 [NovaInOutServices] Servicio cargado");
 console.log(`🔗 [NovaInOutServices] URL Auth:       ${API_AUTH_URL}`);

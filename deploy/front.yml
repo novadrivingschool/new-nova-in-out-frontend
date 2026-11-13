@@ -10,6 +10,8 @@ services:
     image: ghcr.io/novadrivingschool/nio-frontend:${FRONT_IMAGE_TAG:?falta FRONT_IMAGE_TAG en front.env}
     container_name: nio-front-dev
     restart: unless-stopped
+    # La configuración (URLs de APIs y flags) se lee al arrancar desde front.env
+    env_file: front.env
     # Red bridge por defecto: el servidor ya no tiene rangos libres para redes nuevas por proyecto.
     network_mode: bridge
     ports:

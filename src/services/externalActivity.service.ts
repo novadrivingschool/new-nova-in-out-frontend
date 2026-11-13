@@ -1,11 +1,12 @@
 // src/services/externalActivity.service.ts
 // AR externo (Vout) vía el backend del NIO. Solo lectura.
 import { http } from '@/lib/http'
+import { runtimeEnv } from '@/lib/runtimeEnv'
 import { toRemoteClockError } from '@/services/remoteClock.service'
 import type { ExternalArDay, ExternalArEvents, ExternalArOpenNow } from '@/types/externalActivity'
 
 const BASE =
-  (import.meta.env.VITE_API_NOVA_IN_OUT_URL || 'http://localhost:5017') + '/nova-in-out/external-activity'
+  (runtimeEnv('VITE_API_NOVA_IN_OUT_URL') || 'http://localhost:5017') + '/nova-in-out/external-activity'
 
 export const externalActivityService = {
   /** Eventos del día (Chicago) del propio usuario. 409 EXTERNAL_AR_NOT_ENABLED si no usa el AR externo. */

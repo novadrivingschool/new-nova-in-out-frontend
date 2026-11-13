@@ -5,12 +5,13 @@
 // El servidor solo acepta tokens con rol admin/super_admin y mete el socket
 // en la sala `admin:{userId}`, donde llegan los resultados de los handshakes.
 import { readonly, ref } from 'vue'
+import { runtimeEnv } from '@/lib/runtimeEnv'
 import { io, type Socket } from 'socket.io-client'
 import { ensureFreshAccessToken } from '@/lib/http'
 
 export type RealtimeStatus = 'idle' | 'connecting' | 'connected' | 'reconnecting' | 'error'
 
-const API_BASE = (import.meta.env.VITE_API_AUTH_URL || 'http://localhost:5013').replace(/\/+$/, '')
+const API_BASE = (runtimeEnv('VITE_API_AUTH_URL') || 'http://localhost:5013').replace(/\/+$/, '')
 const LS_ACCESS = 'novaio_accessToken'
 /** Reintentos manuales tras un cierre iniciado por el servidor (token/rol inválido). */
 const MAX_SERVER_RETRIES = 5

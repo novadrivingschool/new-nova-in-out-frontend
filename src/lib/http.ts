@@ -1,9 +1,10 @@
 // src/lib/http.ts
 import axios, { AxiosError, type AxiosRequestConfig, type InternalAxiosRequestConfig } from "axios"
+import { runtimeEnv } from '@/lib/runtimeEnv'
 
 const LS_ACCESS = "novaio_accessToken"
 const LS_REFRESH = "novaio_refreshToken"
-const API_BASE = import.meta.env.VITE_API_AUTH_URL || "http://localhost:5013"
+const API_BASE = runtimeEnv('VITE_API_AUTH_URL') || "http://localhost:5013"
 
 const log = (...a: any[]) => console.log("[HTTP]", ...a)
 

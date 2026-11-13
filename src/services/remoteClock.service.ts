@@ -1,5 +1,6 @@
 // src/services/remoteClock.service.ts
 import { http } from '@/lib/http'
+import { runtimeEnv } from '@/lib/runtimeEnv'
 import type {
   ActivityDay,
   ActivityEvent,
@@ -14,7 +15,7 @@ import type {
 } from '@/types/remoteClock'
 
 const API_NOVA_IN_OUT_URL =
-  import.meta.env.VITE_API_NOVA_IN_OUT_URL || 'http://localhost:5017'
+  runtimeEnv('VITE_API_NOVA_IN_OUT_URL') || 'http://localhost:5017'
 
 /** Convierte un error de axios/Nest en { status, code, message } estable para la UI. */
 export function toRemoteClockError(e: any): RemoteClockError {

@@ -9,6 +9,7 @@
  * página resuelve como máximo PAGE_SIZE registros.
  */
 import { computed, ref } from 'vue'
+import { runtimeEnv } from '@/lib/runtimeEnv'
 import NovaInOutServices from '@/services/NovaInOutServices'
 import type { ScreenshotStats } from '@/components/Screenshots/screenshotStats'
 import { captureWindow } from '@/types/screenshots'
@@ -28,7 +29,7 @@ export const PAGE_SIZE = 16
  * si se muestra el botón.
  */
 export const SCREENSHOT_DELETE_ENABLED =
-  import.meta.env.VITE_ENABLE_SCREENSHOT_DELETE === 'true'
+  runtimeEnv('VITE_ENABLE_SCREENSHOT_DELETE') === 'true'
 
 export function useScreenshots() {
   const employees = ref<Employee[]>([])

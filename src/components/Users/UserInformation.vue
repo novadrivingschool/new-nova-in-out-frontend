@@ -432,6 +432,7 @@
 
 <script setup lang="ts">
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue'
+import { runtimeEnv } from '@/lib/runtimeEnv'
 import {
   Gender,
   Role,
@@ -457,7 +458,7 @@ const auth = useAuth()
  */
 const canManageDevBot = computed(
   () =>
-    import.meta.env.VITE_DEV_ACTIVITY_BOT === 'true' &&
+    runtimeEnv('VITE_DEV_ACTIVITY_BOT') === 'true' &&
     !!auth.user?.roles?.includes(Role.SUPER_ADMIN),
 )
 

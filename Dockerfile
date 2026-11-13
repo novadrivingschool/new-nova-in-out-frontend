@@ -1,18 +1,10 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # Etapa 1: BUILD (Vue 3 + Vite)
-# Las variables VITE_* se hornean en el build: cambiar una URL = publicar versión nueva.
+# La configuración (URLs de las APIs y flags) NO se hornea: se lee al arrancar el contenedor desde
+# su entorno (front.env) y se escribe en /config.js. La misma imagen sirve para dev y prod.
 # ─────────────────────────────────────────────────────────────────────────────
 FROM node:20-alpine AS builder
 
-ARG VITE_API_AUTH_URL=https://dev.auth-user.nio.novadrivingone.net
-ARG VITE_API_NOVA_IN_OUT_URL=https://dev.api.nio.novadrivingone.net
-ARG VITE_ENABLE_SCREENSHOT_DELETE=false
-ARG VITE_DEV_ACTIVITY_BOT=false
-
-ENV VITE_API_AUTH_URL=$VITE_API_AUTH_URL
-ENV VITE_API_NOVA_IN_OUT_URL=$VITE_API_NOVA_IN_OUT_URL
-ENV VITE_ENABLE_SCREENSHOT_DELETE=$VITE_ENABLE_SCREENSHOT_DELETE
-ENV VITE_DEV_ACTIVITY_BOT=$VITE_DEV_ACTIVITY_BOT
 
 WORKDIR /app
 
@@ -30,6 +22,10 @@ FROM nginx:stable-alpine AS production
 
 COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Script de arranque (lo ejecuta el entrypoint de nginx): genera /config.js desde el entorno
+COPY docker-entrypoint.d/40-runtime-config.sh /docker-entrypoint.d/40-runtime-config.sh
+RUN sed -i 's/\r$//' /docker-entrypoint.d/40-runtime-config.sh && chmod +x /docker-entrypoint.d/40-runtime-config.sh
 
 EXPOSE 80
 
